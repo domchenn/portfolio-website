@@ -1,29 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --paper: #f6f3ec;
-  --ink: #1d1b18;
-  --ink-soft: #5b5650;
-  --rule: #1d1b18;
-  --rule-light: #cfc9bd;
-  --accent: #8a3324;
+  --bg: #161616;
+  --fg: #ededed;
+  --fg-strong: #ffffff;
+  --muted: #a3a3a3;
+  --label: #8f8f8f;
+  --faint: #6f6f6f;
+  --link-line: #5c5c5c;
+  --rule: #2a2a2a;
+  --rule-soft: #262626;
+  --dash: #3a3a3a;
 }
 
 @theme inline {
-  --color-paper: var(--paper);
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-label: var(--label);
+  --color-faint: var(--faint);
   --color-rule: var(--rule);
-  --color-rule-light: var(--rule-light);
-  --color-accent: var(--accent);
-  --font-serif: var(--font-source-serif), Georgia, serif;
-  --font-mono: var(--font-courier-prime), "Courier New", ui-monospace, monospace;
+  --color-rule-soft: var(--rule-soft);
+  --color-dash: var(--dash);
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+}
+
+html {
+  background: var(--bg);
 }
 
 body {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--font-serif);
-  font-size: 16px;
-  line-height: 1.55;
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+a {
+  color: var(--fg);
+  text-decoration: underline;
+  text-decoration-color: var(--link-line);
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+
+a:hover {
+  color: var(--fg-strong);
+  text-decoration-color: var(--fg);
 }

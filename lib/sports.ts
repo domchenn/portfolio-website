@@ -297,3 +297,42 @@ export async function fetchLastGame(
     date: last.date,
   };
 }
+
+// ---------- Lightweight "next up" helpers for the Teams list ----------
+
+type EspnNextEvent = {
+  name: string;
+  date: string;
+  competitions?: { competitors: { homeAway: "home" | "away"; team: { displayName: string } }[] }[];
+};
+
+export type NextUp = { opponent: string; isHome: boolean; date: string };
+
+/** Next scheduled game for an ESPN team, e.g. path = "basketball/nba/teams/gs". */
+export async function fetchNextUp(path: string): Promise<NextUp | null> {
+  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}`);
+  if (!res.ok) return null;
+  const json: { team?: { displayName: string; nextEvent?: EspnNextEvent[] } } = await res.json();
+  const team = json.team;
+  const event = team?.nextEvent?.[0];
+  if (!team || !event) return null;
+
+  const competitors = event.competitions?.[0]?.competitors ?? [];
+  const us = competitors.find((c) => c.team.displayName === team.displayName);
+  const them = competitors.find((c) => c.team.displayName !== team.displayName);
+  if (us && them) return { opponent: them.team.displayName, isHome: us.homeAway === "home", date: event.date };
+
+  // Fallback: ESPN names events "Away at Home".
+  const [away, home] = event.name.split(" at ");
+  if (!home) return null;
+  const isHome = home === team.displayName;
+  return { opponent: isHome ? away : home, isHome, date: event.date };
+}
+
+/** Tournament currently running on an ESPN tennis tour ("atp" | "wta"). */
+export async function fetchCurrentTournament(tour: "atp" | "wta"): Promise<string | null> {
+  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/tennis/${tour}/scoreboard`);
+  if (!res.ok) return null;
+  const json: { events?: { name: string }[] } = await res.json();
+  return json.events?.[0]?.name ?? null;
+}
