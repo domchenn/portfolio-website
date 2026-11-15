@@ -5,12 +5,43 @@ import { Entry } from "@/components/Entry";
 import TeamsList from "@/components/TeamsList";
 import { usePersistentState } from "@/lib/usePersistentState";
 
-// `note` and `rating` (out of 10) are optional; leave them off to just list the course.
-const courses: { name: string; code: string; note?: string; rating?: number }[] = [
-  { name: "Machine Learning", code: "CSCI 3345" },
-  { name: "Economics and Computation", code: "[course code]" },
-  { name: "Probability Theory", code: "[course code] · now TA'ing it" },
-  { name: "[Course]", code: "[course code]" },
+// Courses by term (no grades). `note` and `rating` (out of 10) are optional per course.
+type Course = { name: string; code: string; note?: string; rating?: number };
+
+const courseTerms: { term: string; courses: Course[] }[] = [
+  {
+    term: "Spring 2027 · next",
+    courses: [
+      { name: "Algorithms", code: "CSCI 3383" },
+      { name: "Applied AI Systems", code: "CSCI 3400" },
+      { name: "AI and Ethics", code: "CSCI 3334" },
+      { name: "Introduction to Abstract Mathematics", code: "MATH 2216" },
+    ],
+  },
+  {
+    term: "Fall 2026 · now",
+    courses: [
+      { name: "Machine Learning", code: "CSCI 3345" },
+      { name: "Economics and Computation", code: "CSCI 3369" },
+      { name: "Computer Systems", code: "CSCI 2271" },
+      { name: "Differential Equations", code: "MATH 4410" },
+    ],
+  },
+  {
+    term: "Earlier",
+    courses: [
+      { name: "Randomness and Computation", code: "CSCI 2244", note: "Now TA'ing it" },
+      { name: "Logic and Computation", code: "CSCI 2243" },
+      { name: "Data, Ethics and Society", code: "CSCI 2268" },
+      { name: "Computer Organization and Lab", code: "CSCI 2272" },
+      { name: "Computer Science II", code: "CSCI 1102" },
+      { name: "Computer Science I", code: "CSCI 1101" },
+      { name: "Linear Algebra", code: "MATH 2210" },
+      { name: "Multivariable Calculus", code: "MATH 2202" },
+      { name: "Calculus II", code: "MATH 1103" },
+      { name: "Principles of Economics", code: "ECON 1101" },
+    ],
+  },
 ];
 
 function Places() {
@@ -56,17 +87,27 @@ function Watching() {
 
 function Courses() {
   return (
-    <div className="flex flex-col border-t border-rule-soft">
-      {courses.map((c, i) => (
-        <div
-          key={i}
-          className="flex flex-wrap justify-between items-baseline gap-x-6 gap-y-1 py-3.5 border-b border-rule-soft"
-        >
-          <div className="flex-[1_1_360px] min-w-0">
-            <span>{c.name}</span> <span className="text-label">{c.code}</span>
-            {c.note && <p className="mt-0.5 mb-0 text-muted">{c.note}</p>}
+    <div className="flex flex-col gap-8">
+      {courseTerms.map(({ term, courses }) => (
+        <div key={term} className="flex flex-col gap-2">
+          <h3 className="m-0 text-[15px] font-normal text-label">{term}</h3>
+          <div className="flex flex-col border-t border-rule-soft">
+            {courses.map((c) => (
+              <div
+                key={c.code}
+                className="flex flex-wrap justify-between items-baseline gap-x-6 gap-y-0.5 py-2.5 border-b border-rule-soft"
+              >
+                <div className="min-w-0">
+                  <span>{c.name}</span>
+                  {c.note && <span className="text-muted"> · {c.note}</span>}
+                </div>
+                <span className="flex gap-4 text-[15px] text-label tabular-nums">
+                  {c.code}
+                  {c.rating !== undefined && <span className="text-fg">{c.rating}/10</span>}
+                </span>
+              </div>
+            ))}
           </div>
-          {c.rating !== undefined && <span className="tabular-nums text-fg">{c.rating}/10</span>}
         </div>
       ))}
     </div>
