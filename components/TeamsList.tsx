@@ -13,7 +13,6 @@ import {
 
 // ---------- formatting ----------
 
-const HOUR = 3600_000;
 const LIVE_REFRESH = 30_000; // while any game is in progress
 const IDLE_REFRESH = 10 * 60_000; // otherwise
 
@@ -40,27 +39,6 @@ function teamView(s: TeamStatus, noun = "game"): View {
   return { lines: [s.last ? `Last: ${fmtLast(s.last)}` : `No recent ${noun}`, next], record: s.record };
 }
 
-/** Boston College: most relevant game across sports, each tagged with sport and that team's record. */
-function bcView(statuses: { sport: string; s: TeamStatus }[]): View {
-  const tag = (x: { sport: string; s: TeamStatus }) => (x.s.record ? `${x.sport} (${x.s.record})` : x.sport);
-  const live = statuses.find((x) => x.s.live);
-  const latest = statuses
-    .filter((x) => x.s.last)
-    .sort((a, b) => Date.parse(b.s.last!.date) - Date.parse(a.s.last!.date))[0];
-  const soonest = statuses
-    .filter((x) => x.s.next)
-    .sort((a, b) => Date.parse(a.s.next!.date) - Date.parse(b.s.next!.date))[0];
-
-  const nextLine = soonest ? `Next: ${tag(soonest)} · ${fmtNext(soonest.s.next!)}` : "No games scheduled";
-  if (live) {
-    const { us, them, detail } = live.s.live!;
-    return { live: `${tag(live)} · ${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, lines: [nextLine] };
-  }
-  return {
-    lines: [latest ? `Last: ${tag(latest)} · ${fmtLast(latest.s.last!)}` : "No recent games", nextLine],
-  };
-}
-
 function tennisView(atp: Tournament | null, wta: Tournament | null): View {
   const now = Date.now();
   const running = (t: Tournament) => Date.parse(t.start) <= now && (!t.end || now < Date.parse(t.end));
@@ -78,27 +56,52 @@ function tennisView(atp: Tournament | null, wta: Tournament | null): View {
 
 // ---------- rows ----------
 
-type RowDef = { name: string; league: string; load: () => Promise<View> };
+type RowDef = { name: string; league: string; href: string; load: () => Promise<View> };
+
+const ESPN_WEB = "https://www.espn.com";
 
 const ROWS: RowDef[] = [
   {
     name: "Golden State Warriors",
     league: "NBA",
+    href: `${ESPN_WEB}/nba/team/_/name/gs`,
     load: async () => teamView(await fetchEspnTeam("basketball/nba", "gs")),
   },
   {
     name: "San Francisco 49ers",
     league: "NFL",
+    href: `${ESPN_WEB}/nfl/team/_/name/sf`,
     load: async () => teamView(await fetchEspnTeam("football/nfl", "sf")),
   },
   {
     name: "Chelsea",
     league: "Premier League",
+    href: `${ESPN_WEB}/soccer/team/_/id/363`,
     load: async () => teamView(await fetchEspnTeam("soccer/eng.1", "363"), "match"),
+  },
+  {
+    name: "Boston College",
+    league: "Football",
+    href: `${ESPN_WEB}/college-football/team/_/id/103`,
+    load: async () => teamView(await fetchEspnTeam("football/college-football", "103")),
+  },
+  {
+    name: "Boston College",
+    league: "Basketball",
+    href: `${ESPN_WEB}/mens-college-basketball/team/_/id/103`,
+    load: async () => teamView(await fetchEspnTeam("basketball/mens-college-basketball", "103")),
+  },
+  {
+    name: "Boston College",
+    league: "Hockey",
+    // ESPN has no college hockey team page, so link BC Athletics instead.
+    href: "https://bceagles.com/sports/mens-ice-hockey",
+    load: async () => teamView(await fetchEspnTeam("hockey/mens-college-hockey", "103")),
   },
   {
     name: "Ferrari & Williams",
     league: "F1",
+    href: `${ESPN_WEB}/f1/standings`,
     load: async () => {
       const f = await fetchF1();
       const lines: string[] = [];
@@ -110,29 +113,9 @@ const ROWS: RowDef[] = [
     },
   },
   {
-    name: "Boston College",
-    league: "Hockey · Football · Basketball",
-    load: async () => {
-      const sports = [
-        ["Hockey", "hockey/mens-college-hockey"],
-        ["Football", "football/college-football"],
-        ["Basketball", "basketball/mens-college-basketball"],
-      ] as const;
-      const results = await Promise.all(
-        sports.map(([sport, path]) =>
-          fetchEspnTeam(path, "103")
-            .then((s) => ({ sport, s }))
-            .catch(() => null)
-        )
-      );
-      const ok = results.filter((r): r is NonNullable<typeof r> => r !== null);
-      if (!ok.length) throw new Error("BC unavailable");
-      return bcView(ok);
-    },
-  },
-  {
     name: "Tennis",
     league: "ATP · WTA",
+    href: `${ESPN_WEB}/tennis/`,
     load: async () => {
       const [atp, wta] = await Promise.all([
         fetchTournament("atp").catch(() => null),
@@ -158,7 +141,7 @@ export default function TeamsList() {
       const results = await Promise.all(
         ROWS.map((r) =>
           r.load().catch((err) => {
-            console.warn(`[teams] ${r.name}:`, err);
+            console.warn(`[teams] ${r.name} ${r.league}:`, err);
             return null;
           })
         )
@@ -192,12 +175,15 @@ export default function TeamsList() {
         const v = views[i];
         return (
           <div
-            key={row.name}
+            key={`${row.name}-${row.league}`}
             className="flex flex-wrap justify-between items-baseline gap-x-6 gap-y-1 py-3.5 border-b border-rule-soft"
           >
             <span className="flex flex-col">
               <span>
-                {row.name} <span className="text-label">{row.league}</span>
+                <a href={row.href} target="_blank" rel="noopener noreferrer">
+                  {row.name}
+                </a>{" "}
+                <span className="text-label">{row.league}</span>
               </span>
               {v?.record && <span className="text-[15px] text-label tabular-nums">{v.record}</span>}
             </span>
