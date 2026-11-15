@@ -1,338 +1,209 @@
-export type F1Driver = {
-  id: string;
-  name: string;
-  code: string;
-  position: number;
-  points: number;
-  team: string;
-};
+// Live sports data for the "Teams I follow" list.
+// Sources (free, no keys, CORS-enabled): ESPN's public site API and Jolpica (Ergast) for F1.
+// Every fetcher resolves to a TeamStatus; the UI decides what to show (live → recent → next).
 
-export type F1Constructor = {
-  id: string;
-  name: string;
-  position: number;
-  points: number;
-};
+const ESPN = "https://site.api.espn.com/apis/site/v2/sports";
+const F1 = "https://api.jolpi.ca/ergast/f1/current";
 
-export type F1Standings = {
-  season: string;
-  round: string;
-  drivers: F1Driver[];
-  constructors: F1Constructor[];
-};
+export type Side = { abbr: string; score: string };
 
-type ErgastDriverStanding = {
-  position: string;
-  points: string;
-  Driver: { driverId: string; code: string; givenName: string; familyName: string };
-  Constructors: { name: string }[];
-};
-
-type ErgastConstructorStanding = {
-  position: string;
-  points: string;
-  Constructor: { constructorId: string; name: string };
-};
-
-type ErgastStandingsResponse = {
-  MRData: {
-    StandingsTable: {
-      StandingsLists: {
-        season: string;
-        round: string;
-        DriverStandings?: ErgastDriverStanding[];
-        ConstructorStandings?: ErgastConstructorStanding[];
-      }[];
-    };
-  };
-};
-
-const TRACKED_DRIVER_IDS = ["hamilton", "leclerc", "sainz"];
-const TRACKED_CONSTRUCTOR_IDS = ["ferrari", "williams"];
-
-export async function fetchF1Standings(): Promise<F1Standings> {
-  const [driverRes, constructorRes] = await Promise.all([
-    fetch("https://api.jolpi.ca/ergast/f1/current/driverStandings.json"),
-    fetch("https://api.jolpi.ca/ergast/f1/current/constructorStandings.json"),
-  ]);
-
-  if (!driverRes.ok || !constructorRes.ok) {
-    throw new Error("F1 standings request failed");
-  }
-
-  const driverJson: ErgastStandingsResponse = await driverRes.json();
-  const constructorJson: ErgastStandingsResponse = await constructorRes.json();
-
-  const driverList = driverJson.MRData.StandingsTable.StandingsLists[0];
-  const constructorList = constructorJson.MRData.StandingsTable.StandingsLists[0];
-
-  const drivers: F1Driver[] = (driverList.DriverStandings ?? [])
-    .filter((s) => TRACKED_DRIVER_IDS.includes(s.Driver.driverId))
-    .map((s) => ({
-      id: s.Driver.driverId,
-      name: `${s.Driver.givenName} ${s.Driver.familyName}`,
-      code: s.Driver.code,
-      position: Number(s.position),
-      points: Number(s.points),
-      team: s.Constructors[0].name,
-    }))
-    .sort((a, b) => a.position - b.position);
-
-  const constructors: F1Constructor[] = (constructorList.ConstructorStandings ?? [])
-    .filter((s) => TRACKED_CONSTRUCTOR_IDS.includes(s.Constructor.constructorId))
-    .map((s) => ({
-      id: s.Constructor.constructorId,
-      name: s.Constructor.name,
-      position: Number(s.position),
-      points: Number(s.points),
-    }))
-    .sort((a, b) => a.position - b.position);
-
-  return {
-    season: driverList.season,
-    round: driverList.round,
-    drivers,
-    constructors,
-  };
-}
-
-export type F1RaceLocation = {
-  raceName: string;
-  locality: string;
-  country: string;
-};
-
-export type F1LastRace = F1RaceLocation & {
-  podium: { position: number; code: string; name: string; time: string }[];
-};
-
-export type F1NextRace = F1RaceLocation & {
-  date: string;
-};
-
-type ErgastResult = {
-  position: string;
-  status: string;
-  Driver: { code: string; givenName: string; familyName: string };
-  Time?: { time: string };
-};
-
-type ErgastRace = {
-  raceName: string;
-  date: string;
-  Circuit: { Location: { locality: string; country: string } };
-  Results?: ErgastResult[];
-};
-
-type ErgastRaceResponse = {
-  MRData: { RaceTable: { Races: ErgastRace[] } };
-};
-
-export async function fetchF1LastRace(): Promise<F1LastRace> {
-  const res = await fetch("https://api.jolpi.ca/ergast/f1/current/last/results.json");
-  if (!res.ok) throw new Error("F1 last race request failed");
-
-  const json: ErgastRaceResponse = await res.json();
-  const race = json.MRData.RaceTable.Races[0];
-
-  const podium = (race.Results ?? [])
-    .slice(0, 3)
-    .map((r) => ({
-      position: Number(r.position),
-      code: r.Driver.code,
-      name: `${r.Driver.givenName} ${r.Driver.familyName}`,
-      time: r.Time?.time ?? r.status,
-    }));
-
-  return {
-    raceName: race.raceName,
-    locality: race.Circuit.Location.locality,
-    country: race.Circuit.Location.country,
-    podium,
-  };
-}
-
-export async function fetchF1NextRace(): Promise<F1NextRace> {
-  const res = await fetch("https://api.jolpi.ca/ergast/f1/current/next.json");
-  if (!res.ok) throw new Error("F1 next race request failed");
-
-  const json: ErgastRaceResponse = await res.json();
-  const race = json.MRData.RaceTable.Races[0];
-
-  return {
-    raceName: race.raceName,
-    locality: race.Circuit.Location.locality,
-    country: race.Circuit.Location.country,
-    date: race.date,
-  };
-}
-
-export type TeamRecord = {
-  id: string;
-  displayName: string;
-  standingSummary?: string;
-  overallSummary?: string;
-  winPercent?: number;
-  streak?: number;
-  nextEvent?: { name: string; date: string };
-};
-
-type EspnStat = { name: string; value: number };
-type EspnRecordItem = { type: string; summary: string; stats: EspnStat[] };
-type EspnTeamResponse = {
-  team: {
-    id: string;
-    displayName: string;
-    standingSummary?: string;
-    record?: { items?: EspnRecordItem[] };
-    nextEvent?: { name: string; date: string }[];
-  };
-};
-
-export async function fetchTeamRecord(
-  sport: "basketball" | "football",
-  league: "nba" | "nfl",
-  slug: string
-): Promise<TeamRecord> {
-  const res = await fetch(
-    `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${slug}`
-  );
-
-  if (!res.ok) {
-    throw new Error(`Team record request failed for ${slug}`);
-  }
-
-  const json: EspnTeamResponse = await res.json();
-  const team = json.team;
-
-  const overall = team.record?.items?.find((item) => item.type === "total");
-  const winPercentStat = overall?.stats?.find((s) => s.name === "winPercent");
-  const streakStat = overall?.stats?.find((s) => s.name === "streak");
-  const nextEvent = team.nextEvent?.[0];
-
-  return {
-    id: team.id,
-    displayName: team.displayName,
-    standingSummary: team.standingSummary,
-    overallSummary: overall?.summary,
-    winPercent: winPercentStat?.value,
-    streak: streakStat?.value,
-    nextEvent: nextEvent ? { name: nextEvent.name, date: nextEvent.date } : undefined,
-  };
-}
-
-export type LastGame = {
-  opponent: string;
+export type LiveGame = { us: Side; them: Side; detail: string };
+export type FinishedGame = {
+  result: "W" | "L" | "D";
+  us: Side;
+  them: Side;
   isHome: boolean;
-  result: "W" | "L";
-  teamScore: string;
-  opponentScore: string;
   date: string;
+};
+export type UpcomingGame = { opponent: string; isHome: boolean; date: string };
+
+export type TeamStatus = {
+  live?: LiveGame;
+  last?: FinishedGame;
+  next?: UpcomingGame;
+  record?: string;
+};
+
+// ---------- ESPN team sports ----------
+
+type EspnTeamRef = {
+  id: string;
+  abbreviation?: string;
+  displayName: string;
+  shortDisplayName?: string;
 };
 
 type EspnCompetitor = {
   homeAway: "home" | "away";
   winner?: boolean;
-  team: { id: string; displayName: string };
-  score?: { displayValue: string };
+  team: EspnTeamRef;
+  score?: string | { displayValue: string };
 };
 
 type EspnEvent = {
+  id: string;
   date: string;
   competitions: {
-    status: { type: { completed: boolean } };
+    status: { type: { state: "pre" | "in" | "post"; completed: boolean; shortDetail: string } };
     competitors: EspnCompetitor[];
   }[];
 };
 
-type EspnScheduleResponse = {
+async function getJson<T>(url: string): Promise<T> {
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`${res.status} ${url}`);
+  return res.json();
+}
+
+const scoreOf = (c: EspnCompetitor) =>
+  typeof c.score === "string" ? c.score : (c.score?.displayValue ?? "");
+const abbrOf = (t: EspnTeamRef) => t.abbreviation ?? t.shortDisplayName ?? t.displayName;
+const nameOf = (t: EspnTeamRef) => t.shortDisplayName ?? t.displayName;
+
+function split(event: EspnEvent, teamId: string) {
+  const comp = event.competitions[0];
+  const us = comp?.competitors.find((c) => c.team.id === teamId);
+  const them = comp?.competitors.find((c) => c.team.id !== teamId);
+  return us && them ? { comp, us, them } : null;
+}
+
+type EspnSchedule = {
+  team?: { id: string; recordSummary?: string };
   events?: EspnEvent[];
 };
 
-async function fetchSchedule(
-  sport: "basketball" | "football",
-  league: "nba" | "nfl",
-  slug: string,
-  seasonParam?: number
-): Promise<EspnEvent[]> {
-  const url = `https://site.api.espn.com/apis/site/v2/sports/${sport}/${league}/teams/${slug}/schedule${
-    seasonParam ? `?season=${seasonParam}` : ""
-  }`;
-  const res = await fetch(url);
-  if (!res.ok) return [];
-  const json: EspnScheduleResponse = await res.json();
-  return json.events ?? [];
-}
+/**
+ * Status for one ESPN team, built only from the team schedule endpoint
+ * (the plain /teams/{id} endpoint doesn't send CORS headers, so browsers block it).
+ * @param path e.g. "basketball/nba" — sport/league
+ * @param team ESPN slug or numeric id, e.g. "gs" or "103"
+ */
+export async function fetchEspnTeam(path: string, team: string): Promise<TeamStatus> {
+  const base = `${ESPN}/${path}/teams/${team}/schedule`;
+  // Soccer schedules list results only; upcoming matches need ?fixture=true.
+  const isSoccer = path.startsWith("soccer/");
+  const [results, fixtures] = await Promise.all([
+    getJson<EspnSchedule>(base),
+    isSoccer ? getJson<EspnSchedule>(`${base}?fixture=true`).catch(() => ({ events: [] })) : null,
+  ]);
 
-export async function fetchLastGame(
-  sport: "basketball" | "football",
-  league: "nba" | "nfl",
-  slug: string,
-  teamId: string
-): Promise<LastGame | null> {
-  const year = new Date().getFullYear();
-  const attempts = [undefined, year, year - 1];
+  const id = results.team?.id ?? team;
+  const record = results.team?.recordSummary;
+  const seen = new Set<string>();
+  const events = [...(results.events ?? []), ...(fixtures?.events ?? [])].filter((e) =>
+    seen.has(e.id) ? false : (seen.add(e.id), true)
+  );
+  const state = (e: EspnEvent) => e.competitions[0]?.status.type.state;
 
-  let completed: EspnEvent[] = [];
-  for (const seasonParam of attempts) {
-    const events = await fetchSchedule(sport, league, slug, seasonParam);
-    completed = events.filter((e) => e.competitions[0]?.status.type.completed);
-    if (completed.length > 0) break;
+  // Most recent finished game (ESPN orders soccer newest-first, others oldest-first — sort to be safe).
+  const finished = events
+    .filter((e) => e.competitions[0]?.status.type.completed)
+    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))[0];
+  let last: FinishedGame | undefined;
+  const f = finished && split(finished, id);
+  if (f) {
+    const result = f.us.winner ? "W" : f.them.winner ? "L" : "D";
+    last = {
+      result,
+      us: { abbr: abbrOf(f.us.team), score: scoreOf(f.us) },
+      them: { abbr: abbrOf(f.them.team), score: scoreOf(f.them) },
+      isHome: f.us.homeAway === "home",
+      date: finished.date,
+    };
   }
 
-  const last = completed[completed.length - 1];
-  if (!last) return null;
+  // In-progress game: the schedule flags it but omits the score, so read the game summary.
+  const liveEvent = events.find((e) => state(e) === "in");
+  let live: LiveGame | undefined;
+  if (liveEvent) {
+    try {
+      const summary = await getJson<{ header: { competitions: EspnEvent["competitions"] } }>(
+        `${ESPN}/${path}/summary?event=${liveEvent.id}`
+      );
+      const s = split({ ...liveEvent, competitions: summary.header.competitions }, id);
+      if (s) {
+        live = {
+          us: { abbr: abbrOf(s.us.team), score: scoreOf(s.us) },
+          them: { abbr: abbrOf(s.them.team), score: scoreOf(s.them) },
+          detail: s.comp.status.type.shortDetail,
+        };
+      }
+    } catch {
+      // fall through: show last/next instead
+    }
+  }
 
-  const competitors = last.competitions[0].competitors;
-  const us = competitors.find((c) => c.team.id === teamId);
-  const them = competitors.find((c) => c.team.id !== teamId);
-  if (!us || !them) return null;
+  // Next scheduled game.
+  const upcoming = events
+    .filter((e) => state(e) === "pre" && Date.parse(e.date) > Date.now() - 6 * 3600_000)
+    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0];
+  let next: UpcomingGame | undefined;
+  const u = upcoming && split(upcoming, id);
+  if (u) next = { opponent: nameOf(u.them.team), isHome: u.us.homeAway === "home", date: upcoming.date };
+
+  return { live, last, next, record };
+}
+
+// ---------- Formula 1 ----------
+
+export type F1Status = {
+  lastRace?: { name: string; date: string; winner: string };
+  nextRace?: { name: string; date: string };
+  drivers: { code: string; position: number; points: number }[];
+};
+
+type ErgastRace = {
+  raceName: string;
+  date: string;
+  time?: string;
+  Results?: { Driver: { code: string } }[];
+};
+
+const TRACKED_DRIVERS = ["hamilton", "leclerc", "sainz", "albon"];
+
+export async function fetchF1(): Promise<F1Status> {
+  type RaceTable = { MRData: { RaceTable: { Races: ErgastRace[] } } };
+  type Standings = {
+    MRData: {
+      StandingsTable: {
+        StandingsLists: {
+          DriverStandings: { position: string; points: string; Driver: { driverId: string; code: string } }[];
+        }[];
+      };
+    };
+  };
+
+  const [last, next, standings] = await Promise.all([
+    getJson<RaceTable>(`${F1}/last/results.json`).catch(() => null),
+    getJson<RaceTable>(`${F1}/next.json`).catch(() => null),
+    getJson<Standings>(`${F1}/driverStandings.json`).catch(() => null),
+  ]);
+
+  const lr = last?.MRData.RaceTable.Races[0];
+  const nr = next?.MRData.RaceTable.Races[0];
+  const list = standings?.MRData.StandingsTable.StandingsLists[0]?.DriverStandings ?? [];
 
   return {
-    opponent: them.team.displayName,
-    isHome: us.homeAway === "home",
-    result: us.winner ? "W" : "L",
-    teamScore: us.score?.displayValue ?? "",
-    opponentScore: them.score?.displayValue ?? "",
-    date: last.date,
+    lastRace: lr
+      ? { name: lr.raceName, date: `${lr.date}T${lr.time ?? "12:00:00Z"}`, winner: lr.Results?.[0]?.Driver.code ?? "" }
+      : undefined,
+    nextRace: nr ? { name: nr.raceName, date: `${nr.date}T${nr.time ?? "12:00:00Z"}` } : undefined,
+    drivers: list
+      .filter((d) => TRACKED_DRIVERS.includes(d.Driver.driverId))
+      .map((d) => ({ code: d.Driver.code, position: Number(d.position), points: Number(d.points) }))
+      .sort((a, b) => a.position - b.position),
   };
 }
 
-// ---------- Lightweight "next up" helpers for the Teams list ----------
+// ---------- Tennis ----------
 
-type EspnNextEvent = {
-  name: string;
-  date: string;
-  competitions?: { competitors: { homeAway: "home" | "away"; team: { displayName: string } }[] }[];
-};
+export type Tournament = { name: string; start: string; end?: string };
 
-export type NextUp = { opponent: string; isHome: boolean; date: string };
-
-/** Next scheduled game for an ESPN team, e.g. path = "basketball/nba/teams/gs". */
-export async function fetchNextUp(path: string): Promise<NextUp | null> {
-  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}`);
-  if (!res.ok) return null;
-  const json: { team?: { displayName: string; nextEvent?: EspnNextEvent[] } } = await res.json();
-  const team = json.team;
-  const event = team?.nextEvent?.[0];
-  if (!team || !event) return null;
-
-  const competitors = event.competitions?.[0]?.competitors ?? [];
-  const us = competitors.find((c) => c.team.displayName === team.displayName);
-  const them = competitors.find((c) => c.team.displayName !== team.displayName);
-  if (us && them) return { opponent: them.team.displayName, isHome: us.homeAway === "home", date: event.date };
-
-  // Fallback: ESPN names events "Away at Home".
-  const [away, home] = event.name.split(" at ");
-  if (!home) return null;
-  const isHome = home === team.displayName;
-  return { opponent: isHome ? away : home, isHome, date: event.date };
-}
-
-/** Tournament currently running on an ESPN tennis tour ("atp" | "wta"). */
-export async function fetchCurrentTournament(tour: "atp" | "wta"): Promise<string | null> {
-  const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/tennis/${tour}/scoreboard`);
-  if (!res.ok) return null;
-  const json: { events?: { name: string }[] } = await res.json();
-  return json.events?.[0]?.name ?? null;
+/** Headline tournament on an ESPN tennis tour ("atp" | "wta"). */
+export async function fetchTournament(tour: "atp" | "wta"): Promise<Tournament | null> {
+  const json = await getJson<{ events?: { name: string; date: string; endDate?: string }[] }>(
+    `${ESPN}/tennis/${tour}/scoreboard`
+  );
+  const e = json.events?.[0];
+  return e ? { name: e.name, start: e.date, end: e.endDate } : null;
 }

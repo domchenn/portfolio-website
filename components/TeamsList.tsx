@@ -1,92 +1,224 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchNextUp, fetchCurrentTournament, fetchF1NextRace, type NextUp } from "@/lib/sports";
+import {
+  fetchEspnTeam,
+  fetchF1,
+  fetchTournament,
+  type FinishedGame,
+  type TeamStatus,
+  type Tournament,
+  type UpcomingGame,
+} from "@/lib/sports";
 
-function shortDate(iso: string) {
-  // F1 dates are plain "YYYY-MM-DD"; parse as local noon so the day doesn't shift.
-  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00`) : new Date(iso);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+// ---------- formatting ----------
+
+const HOUR = 3600_000;
+const LIVE_REFRESH = 30_000; // while any game is in progress
+const IDLE_REFRESH = 10 * 60_000; // otherwise
+
+function when(iso: string, withTime = true) {
+  const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
+  if (withTime) Object.assign(opts, { hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-US", opts);
 }
 
-function formatNextUp(n: NextUp | null) {
-  if (!n) return null;
-  return `Next: ${n.isHome ? "vs" : "at"} ${n.opponent} · ${shortDate(n.date)}`;
+const fmtLast = (g: FinishedGame) =>
+  `${g.result} ${g.us.score}–${g.them.score} ${g.isHome ? "vs" : "at"} ${g.them.abbr}`;
+const fmtNext = (g: UpcomingGame) => `${g.isHome ? "vs" : "at"} ${g.opponent} · ${when(g.date)}`;
+
+/** `live` is the in-progress score (shown first, highlighted); `lines` follow it. */
+type View = { live?: string; lines: string[]; record?: string };
+
+/** Not live: last game + next game (record sits beside the league). Live: score + next game. */
+function teamView(s: TeamStatus, noun = "game"): View {
+  const next = s.next ? `Next: ${fmtNext(s.next)}` : `No ${noun} scheduled`;
+  if (s.live) {
+    const { us, them, detail } = s.live;
+    return { live: `${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, lines: [next], record: s.record };
+  }
+  return { lines: [s.last ? `Last: ${fmtLast(s.last)}` : `No recent ${noun}`, next], record: s.record };
 }
 
-const settle = <T,>(p: Promise<T>) => p.catch(() => null);
+/** Boston College: most relevant game across sports, each tagged with sport and that team's record. */
+function bcView(statuses: { sport: string; s: TeamStatus }[]): View {
+  const tag = (x: { sport: string; s: TeamStatus }) => (x.s.record ? `${x.sport} (${x.s.record})` : x.sport);
+  const live = statuses.find((x) => x.s.live);
+  const latest = statuses
+    .filter((x) => x.s.last)
+    .sort((a, b) => Date.parse(b.s.last!.date) - Date.parse(a.s.last!.date))[0];
+  const soonest = statuses
+    .filter((x) => x.s.next)
+    .sort((a, b) => Date.parse(a.s.next!.date) - Date.parse(b.s.next!.date))[0];
 
-type Row = { name: string; league: string; status: string };
+  const nextLine = soonest ? `Next: ${tag(soonest)} · ${fmtNext(soonest.s.next!)}` : "No games scheduled";
+  if (live) {
+    const { us, them, detail } = live.s.live!;
+    return { live: `${tag(live)} · ${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, lines: [nextLine] };
+  }
+  return {
+    lines: [latest ? `Last: ${tag(latest)} · ${fmtLast(latest.s.last!)}` : "No recent games", nextLine],
+  };
+}
 
-const initialRows: Row[] = [
-  { name: "Golden State Warriors", league: "NBA", status: "Next: …" },
-  { name: "San Francisco 49ers", league: "NFL", status: "Next: …" },
-  { name: "Chelsea", league: "Premier League", status: "Next: …" },
-  { name: "Ferrari & Williams", league: "F1", status: "Next: …" },
-  { name: "Boston College", league: "Hockey · Football · Basketball", status: "Next: …" },
-  { name: "Tennis", league: "ATP · WTA", status: "Now: …" },
+function tennisView(atp: Tournament | null, wta: Tournament | null): View {
+  const now = Date.now();
+  const running = (t: Tournament) => Date.parse(t.start) <= now && (!t.end || now < Date.parse(t.end));
+  const tours = [atp, wta].filter((t): t is Tournament => !!t);
+  if (!tours.length) return { lines: ["Off-season"] };
+  const live = tours.filter(running);
+  const later = tours.filter((t) => !running(t));
+  return {
+    lines: [
+      ...(live.length ? [`Now: ${live.map((t) => t.name).join(" · ")}`] : []),
+      ...later.map((t) => `Next: ${t.name} · ${when(t.start, false)}`),
+    ],
+  };
+}
+
+// ---------- rows ----------
+
+type RowDef = { name: string; league: string; load: () => Promise<View> };
+
+const ROWS: RowDef[] = [
+  {
+    name: "Golden State Warriors",
+    league: "NBA",
+    load: async () => teamView(await fetchEspnTeam("basketball/nba", "gs")),
+  },
+  {
+    name: "San Francisco 49ers",
+    league: "NFL",
+    load: async () => teamView(await fetchEspnTeam("football/nfl", "sf")),
+  },
+  {
+    name: "Chelsea",
+    league: "Premier League",
+    load: async () => teamView(await fetchEspnTeam("soccer/eng.1", "363"), "match"),
+  },
+  {
+    name: "Ferrari & Williams",
+    league: "F1",
+    load: async () => {
+      const f = await fetchF1();
+      const lines: string[] = [];
+      if (f.lastRace) lines.push(`Last: ${f.lastRace.name} · won by ${f.lastRace.winner}`);
+      lines.push(f.nextRace ? `Next: ${f.nextRace.name} · ${when(f.nextRace.date)}` : "Season over");
+      const drivers = f.drivers.map((d) => `${d.code} P${d.position}`).join(" · ");
+      // Driver standings play the role of the "record" for F1.
+      return { lines, record: drivers || undefined };
+    },
+  },
+  {
+    name: "Boston College",
+    league: "Hockey · Football · Basketball",
+    load: async () => {
+      const sports = [
+        ["Hockey", "hockey/mens-college-hockey"],
+        ["Football", "football/college-football"],
+        ["Basketball", "basketball/mens-college-basketball"],
+      ] as const;
+      const results = await Promise.all(
+        sports.map(([sport, path]) =>
+          fetchEspnTeam(path, "103")
+            .then((s) => ({ sport, s }))
+            .catch(() => null)
+        )
+      );
+      const ok = results.filter((r): r is NonNullable<typeof r> => r !== null);
+      if (!ok.length) throw new Error("BC unavailable");
+      return bcView(ok);
+    },
+  },
+  {
+    name: "Tennis",
+    league: "ATP · WTA",
+    load: async () => {
+      const [atp, wta] = await Promise.all([
+        fetchTournament("atp").catch(() => null),
+        fetchTournament("wta").catch(() => null),
+      ]);
+      return tennisView(atp, wta);
+    },
+  },
 ];
 
+// ---------- component ----------
+
 export default function TeamsList() {
-  const [rows, setRows] = useState(initialRows);
+  const [views, setViews] = useState<(View | null)[]>(() => ROWS.map(() => null));
+  const [failed, setFailed] = useState<boolean[]>(() => ROWS.map(() => false));
 
   useEffect(() => {
-    let cancelled = false;
-    const set = (i: number, status: string) => {
-      if (cancelled) return;
-      setRows((prev) => prev.map((r, j) => (j === i ? { ...r, status } : r)));
-    };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
 
-    settle(fetchNextUp("basketball/nba/teams/gs")).then((n) => set(0, formatNextUp(n) ?? "No game scheduled"));
-    settle(fetchNextUp("football/nfl/teams/sf")).then((n) => set(1, formatNextUp(n) ?? "No game scheduled"));
-    settle(fetchNextUp("soccer/eng.1/teams/363")).then((n) => set(2, formatNextUp(n) ?? "No match scheduled"));
-    settle(fetchF1NextRace()).then((r) =>
-      set(3, r ? `Next: ${r.raceName} · ${shortDate(r.date)}` : "Season over")
-    );
-
-    const bcSports = [
-      ["Hockey", "hockey/mens-college-hockey/teams/103"],
-      ["Football", "football/college-football/teams/103"],
-      ["Basketball", "basketball/mens-college-basketball/teams/103"],
-    ] as const;
-    Promise.all(bcSports.map(([, path]) => settle(fetchNextUp(path)))).then((results) => {
-      const soonest = results
-        .map((n, i) => (n ? { sport: bcSports[i][0], ...n } : null))
-        .filter((n): n is NonNullable<typeof n> => n !== null)
-        .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))[0];
-      set(
-        4,
-        soonest
-          ? `Next: ${soonest.sport} · ${soonest.isHome ? "vs" : "at"} ${soonest.opponent} ·${shortDate(soonest.date)}`
-          : "No game scheduled"
+    async function refresh() {
+      clearTimeout(timer);
+      const results = await Promise.all(
+        ROWS.map((r) =>
+          r.load().catch((err) => {
+            console.warn(`[teams] ${r.name}:`, err);
+            return null;
+          })
+        )
       );
-    });
-
-    Promise.all([settle(fetchCurrentTournament("atp")), settle(fetchCurrentTournament("wta"))]).then(
-      ([atp, wta]) => {
-        const names = [...new Set([atp, wta].filter((x): x is string => !!x))];
-        set(5, names.length ? `Now: ${names.join(" · ")}` : "Off-season");
+      if (stopped) return;
+      // Keep the last good value for any row whose request failed.
+      setViews((prev) => results.map((v, i) => v ?? prev[i]));
+      setFailed(results.map((v) => v === null));
+      if (!document.hidden) {
+        timer = setTimeout(refresh, results.some((v) => v?.live) ? LIVE_REFRESH : IDLE_REFRESH);
       }
-    );
+    }
 
+    function onVisibility() {
+      if (document.hidden) clearTimeout(timer);
+      else refresh();
+    }
+
+    refresh();
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      cancelled = true;
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 
   return (
     <div className="flex flex-col border-t border-rule-soft">
-      {rows.map((r) => (
-        <div
-          key={r.name}
-          className="flex flex-wrap justify-between gap-x-6 gap-y-1 py-3.5 border-b border-rule-soft"
-        >
-          <span>
-            {r.name} <span className="text-label">{r.league}</span>
-          </span>
-          <span className="text-muted">{r.status}</span>
-        </div>
-      ))}
+      {ROWS.map((row, i) => {
+        const v = views[i];
+        return (
+          <div
+            key={row.name}
+            className="flex flex-wrap justify-between items-baseline gap-x-6 gap-y-1 py-3.5 border-b border-rule-soft"
+          >
+            <span className="flex flex-col">
+              <span>
+                {row.name} <span className="text-label">{row.league}</span>
+              </span>
+              {v?.record && <span className="text-[15px] text-label tabular-nums">{v.record}</span>}
+            </span>
+            <span className="flex flex-col sm:items-end sm:text-right text-muted">
+              {v?.live && (
+                <span className="text-fg">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block w-1.5 h-1.5 rounded-full bg-[#E5484D] animate-pulse mr-2 align-middle"
+                  />
+                  <span className="sr-only">Live: </span>
+                  {v.live}
+                </span>
+              )}
+              {v
+                ? v.lines.map((line, j) => <span key={j}>{line}</span>)
+                : <span>{failed[i] ? "Unavailable right now" : "Loading…"}</span>}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
