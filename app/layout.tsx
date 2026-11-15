@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { basePath } from "@/lib/basePath";
 import "./globals.css";
@@ -16,10 +16,16 @@ export const metadata: Metadata = {
     "CS + AI at Boston College.",
   icons: {
     icon: [
-      { url: `${basePath}/dc-logo-favicon.ico` },
-      { url: `${basePath}/dc-logo-favicon.png`, type: "image/png" },
+      { url: `${basePath}/favicon.ico`, sizes: "32x32" },
+      { url: `${basePath}/favicon.svg`, type: "image/svg+xml" },
     ],
+    apple: `${basePath}/apple-touch-icon.png`,
   },
+  manifest: `${basePath}/site.webmanifest`,
+};
+
+export const viewport: Viewport = {
+  themeColor: "#161616",
 };
 
 export default function RootLayout({
