@@ -5,7 +5,7 @@ import { Entry } from "@/components/Entry";
 import TeamsList from "@/components/TeamsList";
 import { usePersistentState } from "@/lib/usePersistentState";
 
-// CS + Math courses by semester, oldest first (no grades).
+// CS + Math courses by semester, listed oldest first (shown newest first). No grades.
 // `note` and `rating` (out of 10) are optional per course.
 type Course = { name: string; code: string; note?: string; rating?: number };
 type TermStatus = "past" | "now" | "next";
@@ -115,19 +115,20 @@ const dotStyles: Record<TermStatus, string> = {
   next: "bg-bg border-fg border-dashed",
 };
 
-/** Vertical timeline, freshman year at the top down to now, then next semester. */
+/** Vertical timeline, newest at the top: next semester, now, then back to freshman year. */
 function Courses() {
+  const terms = [...courseTerms].reverse();
   return (
     <ol className="m-0 p-0 list-none flex flex-col">
-      {courseTerms.map(({ term, year, status, courses }, i) => {
-        const isLast = i === courseTerms.length - 1;
+      {terms.map(({ term, year, status, courses }, i) => {
+        const isLast = i === terms.length - 1;
         return (
           <li key={term} className="relative pl-7 pb-7 last:pb-0">
             {!isLast && (
               <span
                 aria-hidden="true"
                 className={`absolute left-[5px] top-3 bottom-0 w-px ${
-                  courseTerms[i + 1].status === "next" ? "border-l border-dashed border-rule" : "bg-rule"
+                  status === "next" ? "border-l border-dashed border-rule" : "bg-rule"
                 }`}
               />
             )}
