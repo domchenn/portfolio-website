@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Entry } from "@/components/Entry";
 import TeamsList from "@/components/TeamsList";
 import { usePersistentState } from "@/lib/usePersistentState";
@@ -86,7 +86,7 @@ function Interests() {
   );
 }
 
-// Restaurants by city. Add a city to get a new sub-tab; `note` is optional (e.g. what to order).
+// Top restaurants by city, in order. Add a city to get a new sub-tab; `note` is optional (e.g. what to order).
 type Restaurant = { name: string; note?: string };
 
 const eats: { city: string; places: Restaurant[] }[] = [
@@ -122,14 +122,22 @@ function Food() {
           </button>
         ))}
       </div>
-      <ul className="m-0 p-0 list-none flex flex-col border-t border-rule-soft">
-        {current.places.map((r) => (
-          <li key={r.name} className="py-2.5 border-b border-rule-soft">
-            {r.name}
-            {r.note && <span className="block text-[15px] text-muted">{r.note}</span>}
-          </li>
-        ))}
-      </ul>
+      <div className="flex flex-col gap-2">
+        <h3 className="m-0 text-[15px] font-normal text-label">
+          Top restaurants I&apos;ve eaten at in {current.city}
+        </h3>
+        <ol className="m-0 p-0 list-none flex flex-col border-t border-rule-soft">
+          {current.places.map((r, i) => (
+            <li key={r.name} className="flex gap-4 items-baseline py-2.5 border-b border-rule-soft">
+              <span className="w-4 shrink-0 text-[15px] text-label tabular-nums">{i + 1}</span>
+              <span className="min-w-0">
+                {r.name}
+                {r.note && <span className="block text-[15px] text-muted">{r.note}</span>}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
     </div>
   );
 }
@@ -254,7 +262,7 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
   { id: "watching", label: "Top shows & movies", content: <Watching /> },
-  { id: "food", label: "Where I eat", content: <Food /> },
+  { id: "food", label: "Top restaurants", content: <Food /> },
   { id: "interests", label: "Interests", content: <Interests />, hidden: true },
 ];
 
@@ -268,6 +276,43 @@ export default function AboutPanel({ places }: { places?: ReactNode }) {
   const active = Math.max(0, tabs.findIndex((t) => t.id === tabPref));
   const setActive = (i: number) => setTabPref(tabs[i].id);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [fade, setFade] = useState({ left: false, right: false });
+
+  // Tab row scrolls sideways: track whether there's more to either side (drives the edge fades).
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () =>
+      setFade({ left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 });
+    const ro = new ResizeObserver(update); // also fires once on observe
+    ro.observe(el);
+    el.addEventListener("scroll", update, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", update);
+    };
+  }, [open]);
+
+  // Keep the selected tab in view (horizontal only, so the page never jumps vertically).
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    const tab = tabRefs.current[active];
+    if (!scroller || !tab) return;
+    const pad = 32;
+    const left = tab.offsetLeft - scroller.offsetLeft;
+    const right = left + tab.offsetWidth;
+    if (left < scroller.scrollLeft + pad) scroller.scrollTo({ left: Math.max(0, left - pad), behavior: "smooth" });
+    else if (right > scroller.scrollLeft + scroller.clientWidth - pad)
+      scroller.scrollTo({ left: right - scroller.clientWidth + pad, behavior: "smooth" });
+  }, [active, open]);
+
+  const mask =
+    fade.left || fade.right
+      ? `linear-gradient(to right, ${fade.left ? "transparent 0, #000 40px" : "#000 0"}, ${
+          fade.right ? "#000 calc(100% - 40px), transparent 100%" : "#000 100%"
+        })`
+      : undefined;
 
   function onTabKey(e: KeyboardEvent) {
     const last = tabs.length - 1;
@@ -314,10 +359,12 @@ export default function AboutPanel({ places }: { places?: ReactNode }) {
         <div id="about-panel" className="flex flex-col gap-10 pt-3 pb-2">
           <div className="flex flex-col gap-6">
             <div
+              ref={scrollerRef}
               role="tablist"
               aria-label="More about me"
               onKeyDown={onTabKey}
-              className="flex flex-wrap gap-x-6 gap-y-2 border-b border-rule-soft"
+              style={{ maskImage: mask, WebkitMaskImage: mask }}
+              className="flex gap-6 overflow-x-auto overscroll-x-contain snap-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden shadow-[inset_0_-1px_0_var(--rule-soft)]"
             >
               {tabs.map((t, i) => {
                 const selected = i === active;
@@ -334,7 +381,7 @@ export default function AboutPanel({ places }: { places?: ReactNode }) {
                     aria-controls={`panel-${t.id}`}
                     tabIndex={selected ? 0 : -1}
                     onClick={() => setActive(i)}
-                    className={`-mb-px cursor-pointer bg-transparent border-0 border-b px-0 pb-2.5 pt-1 font-[inherit] text-[15px] transition-colors ${selected ? "text-fg border-fg" : "text-label border-transparent hover:text-fg"
+                    className={`shrink-0 snap-start whitespace-nowrap cursor-pointer bg-transparent border-0 border-b px-0 pb-2.5 pt-1 font-[inherit] text-[15px] transition-colors ${selected ? "text-fg border-fg" : "text-label border-transparent hover:text-fg"
                       }`}
                   >
                     {t.label}
