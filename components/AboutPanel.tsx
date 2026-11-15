@@ -147,16 +147,6 @@ type Title = { name: string; year: string; note?: string };
 
 const topLists: { heading: string; items: Title[] }[] = [
   {
-    heading: "Shows",
-    items: [
-      { name: "The Big Bang Theory", year: "2007–2019" },
-      { name: "Suits", year: "2011–2019" },
-      { name: "Grey's Anatomy", year: "2005–" },
-      { name: "Breaking Bad", year: "2008–2013" },
-      { name: "Ted Lasso", year: "2020–" },
-    ],
-  },
-  {
     heading: "Movies",
     items: [
       { name: "The Social Network", year: "2010" },
@@ -164,6 +154,16 @@ const topLists: { heading: string; items: Title[] }[] = [
       { name: "Ratatouille", year: "2007" },
       { name: "Spirited Away", year: "2001" },
       { name: "Inglourious Basterds", year: "2009" },
+    ],
+  },
+  {
+    heading: "Shows",
+    items: [
+      { name: "The Big Bang Theory", year: "2007–2019" },
+      { name: "Suits", year: "2011–2019" },
+      { name: "Grey's Anatomy", year: "2005–" },
+      { name: "Breaking Bad", year: "2008–2013" },
+      { name: "Ted Lasso", year: "2020–" },
     ],
   },
 ];
@@ -260,8 +260,8 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
   },
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
-  { id: "watching", label: "Top shows & movies", content: <Watching /> },
   { id: "food", label: "Top restaurants", content: <Food /> },
+  { id: "watching", label: "Top movies & shows", content: <Watching /> },
   { id: "courses", label: "Courses I've taken", content: <Courses /> },
   { id: "interests", label: "Interests", content: <Interests />, hidden: true },
 ];
