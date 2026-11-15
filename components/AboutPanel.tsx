@@ -258,11 +258,11 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
       </div>
     ),
   },
-  { id: "courses", label: "Courses I've taken", content: <Courses /> },
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
   { id: "watching", label: "Top shows & movies", content: <Watching /> },
   { id: "food", label: "Top restaurants", content: <Food /> },
+  { id: "courses", label: "Courses I've taken", content: <Courses /> },
   { id: "interests", label: "Interests", content: <Interests />, hidden: true },
 ];
 
