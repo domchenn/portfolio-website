@@ -180,7 +180,7 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
   { id: "courses", label: "Courses I've taken", content: <Courses /> },
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
-  { id: "interests", label: "Interests", content: <Interests /> },
+  { id: "interests", label: "Interests", content: <Interests />, hidden: true },
 ];
 
 const tabs = allTabs.filter((t) => !t.hidden);
