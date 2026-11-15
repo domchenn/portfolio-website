@@ -1,4 +1,5 @@
 import AboutPanel from "@/components/AboutPanel";
+import LocalClock from "@/components/LocalClock";
 import { Entry, ColumnHeading } from "@/components/Entry";
 
 export default function Home() {
@@ -7,7 +8,10 @@ export default function Home() {
       <div className="relative z-[1] max-w-[760px] mx-auto px-7 pt-[120px] pb-16">
         <main className="flex flex-col gap-[72px]">
           <header className="flex flex-col gap-7">
-            <h1 className="m-0 text-[18px] font-medium tracking-[-0.01em]">Dominic Chen</h1>
+            <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
+              <h1 className="m-0 text-[18px] font-medium tracking-[-0.01em]">Dominic Chen</h1>
+              <LocalClock />
+            </div>
             <p className="m-0 text-[19px] leading-[1.7]">
               <em className="italic"></em> CS + AI + Math at{" "}
               <a href="https://www.bc.edu">Boston College </a>  (&apos;28)
