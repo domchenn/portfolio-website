@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Entry } from "@/components/Entry";
 import TeamsList from "@/components/TeamsList";
+import { usePersistentState } from "@/lib/usePersistentState";
 
 // `note` and `rating` (out of 10) are optional; leave them off to just list the course.
 const courses: { name: string; code: string; note?: string; rating?: number }[] = [
@@ -93,8 +94,12 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
 const tabs = allTabs.filter((t) => !t.hidden);
 
 export default function AboutPanel() {
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
+  // Remembered across refreshes so the panel doesn't snap shut on reload.
+  const [openPref, setOpenPref] = usePersistentState("about:open", "0");
+  const [tabPref, setTabPref] = usePersistentState("about:tab", tabs[0].id);
+  const open = openPref === "1";
+  const active = Math.max(0, tabs.findIndex((t) => t.id === tabPref));
+  const setActive = (i: number) => setTabPref(tabs[i].id);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function onTabKey(e: KeyboardEvent) {
@@ -115,7 +120,7 @@ export default function AboutPanel() {
     <section aria-label="About" className="flex flex-col border-t border-rule">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpenPref(open ? "0" : "1")}
         aria-expanded={open}
         aria-controls="about-panel"
         className="box-border cursor-pointer flex items-center justify-between min-h-14 py-4 bg-transparent border-0 font-[inherit] text-[17px] text-fg text-left"
