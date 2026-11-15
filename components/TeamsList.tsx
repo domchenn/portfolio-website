@@ -24,17 +24,19 @@ const fmtLast = (g: FinishedGame) =>
   `${g.result} ${g.us.score}–${g.them.score} ${g.isHome ? "vs" : "at"} ${g.them.abbr}`;
 const fmtNext = (g: UpcomingGame) => `${g.isHome ? "vs" : "at"} ${g.opponent} · ${when(g.date)}`;
 
-/** `live` is the in-progress score (shown first, highlighted); `lines` follow it. */
-type View = { live?: string; lines: string[]; record?: string };
+/** `live` is the in-progress score (shown first, highlighted); `items` are labeled lines below it. */
+type Item = { label: string; value: string };
+type View = { live?: string; items: Item[]; record?: string };
 
-/** Not live: last game + next game (record sits beside the league). Live: score + next game. */
+/** Not live: last game + next game. Live: score + next game. Record shows under the team name. */
 function teamView(s: TeamStatus, noun = "game"): View {
-  const next = s.next ? `Next: ${fmtNext(s.next)}` : `No ${noun} scheduled`;
+  const next: Item = { label: "Next", value: s.next ? fmtNext(s.next) : `No ${noun} scheduled` };
   if (s.live) {
     const { us, them, detail } = s.live;
-    return { live: `${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, lines: [next], record: s.record };
+    return { live: `${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, items: [next], record: s.record };
   }
-  return { lines: [s.last ? `Last: ${fmtLast(s.last)}` : `No recent ${noun}`, next], record: s.record };
+  const last: Item = { label: "Last", value: s.last ? fmtLast(s.last) : `No recent ${noun}` };
+  return { items: [last, next], record: s.record };
 }
 
 // ---------- rows ----------
@@ -84,12 +86,12 @@ const ROWS: RowDef[] = [
     league: "F1",
     load: async () => {
       const f = await fetchF1();
-      const lines: string[] = [];
-      if (f.lastRace) lines.push(`Last: ${f.lastRace.name} · won by ${f.lastRace.winner}`);
-      lines.push(f.nextRace ? `Next: ${f.nextRace.name} · ${when(f.nextRace.date)}` : "Season over");
+      const items: Item[] = [];
+      if (f.lastRace) items.push({ label: "Last", value: `${f.lastRace.name} · won by ${f.lastRace.winner}` });
+      items.push({ label: "Next", value: f.nextRace ? `${f.nextRace.name} · ${when(f.nextRace.date)}` : "Season over" });
       const drivers = f.drivers.map((d) => `${d.code} P${d.position}`).join(" · ");
       // Driver standings play the role of the "record" for F1.
-      return { lines, record: drivers || undefined };
+      return { items, record: drivers || undefined };
     },
   },
 ];
@@ -145,36 +147,46 @@ export default function TeamsList() {
   }, []);
 
   return (
-    <div className="flex flex-col border-t border-rule-soft">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
       {ROWS.map((row) => {
         const v = views[row.id];
         return (
-          <div
+          <article
             key={row.id}
-            className="flex flex-wrap justify-between items-baseline gap-x-6 gap-y-1 py-3.5 border-b border-rule-soft"
+            className={`flex flex-col gap-4 rounded-lg border p-4 ${v?.live ? "border-[#4A2A2C]" : "border-rule"}`}
           >
-            <span className="flex flex-col">
-              <span>
-                {row.name} <span className="text-label">{row.league}</span>
-              </span>
-              {v?.record && <span className="text-[15px] text-label tabular-nums">{v.record}</span>}
-            </span>
-            <span className="flex flex-col sm:items-end sm:text-right text-muted">
-              {v?.live && (
-                <span className="text-fg">
-                  <span
-                    aria-hidden="true"
-                    className="inline-block w-1.5 h-1.5 rounded-full bg-[#E5484D] animate-pulse mr-2 align-middle"
-                  />
-                  <span className="sr-only">Live: </span>
-                  {v.live}
-                </span>
-              )}
-              {v
-                ? v.lines.map((line, j) => <span key={j}>{line}</span>)
-                : <span>{failed[row.id] ? "Unavailable right now" : "Loading…"}</span>}
-            </span>
-          </div>
+            <header className="flex flex-col">
+              <span className="text-[15px] text-label">{row.league}</span>
+              <h3 className="m-0 text-[17px] font-medium leading-snug">{row.name}</h3>
+              {v?.record && <span className="text-[15px] text-muted tabular-nums">{v.record}</span>}
+            </header>
+
+            {v?.live && (
+              <p className="m-0 text-fg">
+                <span
+                  aria-hidden="true"
+                  className="inline-block w-1.5 h-1.5 rounded-full bg-[#E5484D] animate-pulse mr-2 align-middle"
+                />
+                <span className="sr-only">Live: </span>
+                {v.live}
+              </p>
+            )}
+
+            {v ? (
+              <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[15px] leading-snug">
+                {v.items.map((item) => (
+                  <div key={item.label} className="contents">
+                    <dt className="text-label">{item.label}</dt>
+                    <dd className="m-0 text-muted">{item.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="m-0 text-[15px] text-label">
+                {failed[row.id] ? "Unavailable right now" : "Loading…"}
+              </p>
+            )}
+          </article>
         );
       })}
     </div>
