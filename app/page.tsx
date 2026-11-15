@@ -15,7 +15,7 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-5">
               <p className="m-0 text-[19px] leading-[1.7]">
-                CS + AI + Math at <a href="https://www.bc.edu">Boston College</a> (&apos;28)
+                CS + AI + Math at <a href="https://www.bc.edu">Boston College </a> (&apos;28)
               </p>
               <div className="flex flex-col gap-4 text-muted">
                 <p className="m-0">
