@@ -16,6 +16,7 @@ const courseTerms: { term: string; courses: Course[] }[] = [
       { name: "Applied AI Systems", code: "CSCI 3400" },
       { name: "AI and Ethics", code: "CSCI 3334" },
       { name: "Introduction to Abstract Mathematics", code: "MATH 2216" },
+      { name: "Probability", code: "MATH 4426" },
     ],
   },
   {
