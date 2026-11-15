@@ -1,11 +1,10 @@
 import AboutPanel from "@/components/AboutPanel";
-import Skyline from "@/components/Skyline";
 import { Entry, ColumnHeading } from "@/components/Entry";
 
 export default function Home() {
   return (
     <div className="relative min-h-screen">
-      <div className="relative z-[1] max-w-[760px] mx-auto px-7 pt-[120px] pb-[340px]">
+      <div className="relative z-[1] max-w-[760px] mx-auto px-7 pt-[120px] pb-16">
         <main className="flex flex-col gap-[72px]">
           <header className="flex flex-col gap-7">
             <h1 className="m-0 text-[18px] font-medium tracking-[-0.01em]">Dominic Chen</h1>
@@ -65,7 +64,6 @@ export default function Home() {
           </footer>
         </main>
       </div>
-      <Skyline />
     </div>
   );
 }
