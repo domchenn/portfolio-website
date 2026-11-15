@@ -68,6 +68,24 @@ const courseTerms: { term: string; year?: string; status: TermStatus; courses: C
   },
 ];
 
+const interests: { title: string; note: string }[] = [
+  { title: "Travel", note: "Points and miles: using credit card rewards to get further for less." },
+  { title: "Medicine and health", note: "How medicine works, and where technology can help." },
+  { title: "Finance", note: "Personal finance and markets. Part of why I'm building Otto." },
+];
+
+function Interests() {
+  return (
+    <div className="flex flex-col gap-5">
+      {interests.map((i) => (
+        <Entry key={i.title} title={i.title}>
+          {i.note}
+        </Entry>
+      ))}
+    </div>
+  );
+}
+
 function Food() {
   return (
     <div className="flex flex-col gap-5">
@@ -162,6 +180,7 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
   { id: "courses", label: "Courses I've taken", content: <Courses /> },
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
+  { id: "interests", label: "Interests", content: <Interests /> },
 ];
 
 const tabs = allTabs.filter((t) => !t.hidden);

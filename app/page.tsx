@@ -30,8 +30,8 @@ export default function Home() {
                   storytelling and design.
                 </p>
                 <p className="m-0">
-                  Outside of academics, I&apos;m always looking for opportunities to learn, create,
-                  and connect with interesting people.
+                  Outside of academics, I love to travel, and I&apos;m always looking for
+                  opportunities to learn, create, and connect with interesting people.
                 </p>
               </div>
             </div>
