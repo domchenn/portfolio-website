@@ -12,10 +12,28 @@ export default function Home() {
               <h1 className="m-0 text-[18px] font-medium tracking-[-0.01em]">Dominic Chen</h1>
               <LocalClock />
             </div>
-            <p className="m-0 text-[19px] leading-[1.7]">
-              <em className="italic"></em> CS + AI + Math at{" "}
-              <a href="https://www.bc.edu">Boston College </a>  (&apos;28)
-            </p>
+            <div className="flex flex-col gap-5">
+              <p className="m-0 text-[19px] leading-[1.7]">
+                CS + AI + Math at <a href="https://www.bc.edu">Boston College</a> (&apos;28)
+              </p>
+              <div className="flex flex-col gap-4 text-muted">
+                <p className="m-0">
+                  I&apos;m a Computer Science student at Boston College with interests in
+                  technology, entrepreneurship, content creation, and building things that solve
+                  real problems.
+                </p>
+                <p className="m-0">
+                  I enjoy exploring new ideas, learning how things work, and finding creative ways
+                  to bring concepts to life. I&apos;m especially interested in the intersection of
+                  technology, business, and creativity, where I can combine technical thinking with
+                  storytelling and design.
+                </p>
+                <p className="m-0">
+                  Outside of academics, I&apos;m always looking for opportunities to learn, create,
+                  and connect with interesting people.
+                </p>
+              </div>
+            </div>
           </header>
 
           <section

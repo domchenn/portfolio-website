@@ -187,23 +187,6 @@ export default function AboutPanel() {
 
       {open && (
         <div id="about-panel" className="flex flex-col gap-10 pt-3 pb-2">
-          <div className="flex flex-col gap-[1.7em] text-[19px] leading-[1.7]">
-            <p className="m-0">
-              I&apos;m a Computer Science student at Boston College with interests in technology,
-              entrepreneurship, content creation, and building things that solve real problems.
-            </p>
-            <p className="m-0">
-              I enjoy exploring new ideas, learning how things work, and finding creative ways to
-              bring concepts to life. I&apos;m especially interested in the intersection of
-              technology, business, and creativity, where I can combine technical thinking with
-              storytelling and design.
-            </p>
-            <p className="m-0">
-              Outside of academics, I&apos;m always looking for opportunities to learn, create, and
-              connect with interesting people.
-            </p>
-          </div>
-
           <div className="flex flex-col gap-6">
             <div
               role="tablist"
