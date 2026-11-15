@@ -86,14 +86,50 @@ function Interests() {
   );
 }
 
+// Restaurants by city. Add a city to get a new sub-tab; `note` is optional (e.g. what to order).
+type Restaurant = { name: string; note?: string };
+
+const eats: { city: string; places: Restaurant[] }[] = [
+  {
+    city: "Boston",
+    places: [
+      { name: "Yume Ga Arukara" },
+      { name: "Rochambeau" },
+      { name: "Avra" },
+      { name: "Bar Vlaha" },
+      { name: "Mountain House" },
+    ],
+  },
+];
+
 function Food() {
+  const [cityPref, setCity] = usePersistentState("eats:city", eats[0].city);
+  const current = eats.find((e) => e.city === cityPref) ?? eats[0];
   return (
     <div className="flex flex-col gap-5">
-      {[0, 1, 2].map((i) => (
-        <Entry key={i} title="[Restaurant]">
-          [Neighborhood · what to order]
-        </Entry>
-      ))}
+      <div role="group" aria-label="City" className="flex flex-wrap gap-x-4 gap-y-1 text-[15px]">
+        {eats.map(({ city }) => (
+          <button
+            key={city}
+            type="button"
+            aria-pressed={city === current.city}
+            onClick={() => setCity(city)}
+            className={`cursor-pointer bg-transparent border-0 p-0 font-[inherit] transition-colors ${
+              city === current.city ? "text-fg" : "text-label hover:text-fg"
+            }`}
+          >
+            {city}
+          </button>
+        ))}
+      </div>
+      <ul className="m-0 p-0 list-none flex flex-col border-t border-rule-soft">
+        {current.places.map((r) => (
+          <li key={r.name} className="py-2.5 border-b border-rule-soft">
+            {r.name}
+            {r.note && <span className="block text-[15px] text-muted">{r.note}</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -204,7 +240,6 @@ function Courses() {
 
 // Set `hidden: true` to take a tab off the page without deleting its content.
 const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean }[] = [
-  { id: "food", label: "Where I eat", content: <Food />, hidden: true },
   {
     id: "teams",
     label: "Sports teams I follow",
@@ -219,6 +254,7 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
   { id: "watching", label: "Top shows & movies", content: <Watching /> },
+  { id: "food", label: "Where I eat", content: <Food /> },
   { id: "interests", label: "Interests", content: <Interests />, hidden: true },
 ];
 
