@@ -35,7 +35,7 @@ const courseTerms: { term: string; status: TermStatus; courses: Course[] }[] = [
     term: "Earlier",
     status: "past",
     courses: [
-      { name: "Randomness and Computation", code: "CSCI 2244", note: "Now TA'ing it" },
+      { name: "Randomness and Computation", code: "CSCI 2244" },
       { name: "Logic and Computation", code: "CSCI 2243" },
       { name: "Data, Ethics and Society", code: "CSCI 2268" },
       { name: "Computer Organization and Lab", code: "CSCI 2272" },
@@ -44,7 +44,6 @@ const courseTerms: { term: string; status: TermStatus; courses: Course[] }[] = [
       { name: "Linear Algebra", code: "MATH 2210" },
       { name: "Multivariable Calculus", code: "MATH 2202" },
       { name: "Calculus II", code: "MATH 1103" },
-      { name: "Principles of Economics", code: "ECON 1101" },
     ],
   },
 ];
@@ -90,56 +89,10 @@ function Watching() {
   );
 }
 
-const dotStyles: Record<TermStatus, string> = {
-  now: "bg-fg border-fg",
-  next: "bg-bg border-fg",
-  past: "bg-bg border-label",
-};
-
-/** Vertical timeline: one dot per term (newest first), courses inline as compact text. */
-function CoursesTimeline() {
-  return (
-    <ol className="m-0 p-0 list-none flex flex-col">
-      {courseTerms.map(({ term, status, courses }, i) => {
-        const isLast = i === courseTerms.length - 1;
-        return (
-          <li key={term} className="relative pl-7 pb-8 last:pb-0">
-            {/* rail */}
-            {!isLast && (
-              <span aria-hidden="true" className="absolute left-[5px] top-3 bottom-0 w-px bg-rule" />
-            )}
-            {/* dot */}
-            <span
-              aria-hidden="true"
-              className={`absolute left-0 top-[7px] w-[11px] h-[11px] rounded-full border ${dotStyles[status]}`}
-            />
-            <h3 className="m-0 text-[15px] font-normal">
-              <span className={status === "past" ? "text-label" : "text-fg"}>{term}</span>
-              {status !== "past" && <span className="text-label"> · {status}</span>}
-            </h3>
-            <p className="mt-1.5 mb-0 text-muted leading-[1.7]">
-              {courses.map((c, j) => (
-                <span key={c.code}>
-                  <span title={c.code} className="whitespace-nowrap">
-                    {c.name}
-                    {c.note && <span className="text-label"> ({c.note})</span>}
-                    {c.rating !== undefined && <span className="text-label"> {c.rating}/10</span>}
-                  </span>
-                  {j < courses.length - 1 && <span className="text-label" aria-hidden="true"> · </span>}
-                </span>
-              ))}
-            </p>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-const SUBJECTS: Record<string, string> = { CSCI: "Computer Science", MATH: "Math", ECON: "Economics" };
+const SUBJECTS: Record<string, string> = { CSCI: "Computer Science", MATH: "Math" };
 
 /** Courses grouped by subject (from the course code prefix), current/next ones tagged. */
-function CoursesBySubject() {
+function Courses() {
   const groups = new Map<string, (Course & { status: TermStatus })[]>();
   for (const { status, courses } of courseTerms) {
     for (const c of courses) {
@@ -175,35 +128,6 @@ function CoursesBySubject() {
           </ul>
         </div>
       ))}
-    </div>
-  );
-}
-
-const COURSE_VIEWS = [
-  { id: "term", label: "By term" },
-  { id: "subject", label: "By subject" },
-] as const;
-
-function Courses() {
-  const [view, setView] = usePersistentState("courses:view", "term");
-  return (
-    <div className="flex flex-col gap-6">
-      <div role="group" aria-label="Course layout" className="flex gap-4 text-[15px]">
-        {COURSE_VIEWS.map((v) => (
-          <button
-            key={v.id}
-            type="button"
-            aria-pressed={view === v.id}
-            onClick={() => setView(v.id)}
-            className={`cursor-pointer bg-transparent border-0 p-0 font-[inherit] transition-colors ${
-              view === v.id ? "text-fg" : "text-label hover:text-fg"
-            }`}
-          >
-            {v.label}
-          </button>
-        ))}
-      </div>
-      {view === "subject" ? <CoursesBySubject /> : <CoursesTimeline />}
     </div>
   );
 }
