@@ -68,25 +68,6 @@ const courseTerms: { term: string; year?: string; status: TermStatus; courses: C
   },
 ];
 
-function Places() {
-  return (
-    <div className="flex flex-col gap-5">
-      <div
-        role="img"
-        aria-label="Map placeholder for travel pins"
-        className="h-[280px] border border-dashed border-dash rounded-md flex items-center justify-center text-label text-[15px]"
-      >
-        [Map with a pin per destination]
-      </div>
-      <div className="flex flex-wrap gap-x-6 gap-y-2 text-muted">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <span key={n}>[Destination {n}]</span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function Food() {
   return (
     <div className="flex flex-col gap-5">
@@ -166,7 +147,6 @@ function Courses() {
 
 // Set `hidden: true` to take a tab off the page without deleting its content.
 const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean }[] = [
-  { id: "places", label: "Places I've been", content: <Places />, hidden: true },
   { id: "food", label: "Where I eat", content: <Food />, hidden: true },
   { id: "watching", label: "Watching", content: <Watching />, hidden: true },
   {
@@ -180,11 +160,13 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
     ),
   },
   { id: "courses", label: "Courses I've taken", content: <Courses /> },
+  // Filled in from the server (see `places` prop) so the map ships as static SVG.
+  { id: "places", label: "Places I've been", content: null },
 ];
 
 const tabs = allTabs.filter((t) => !t.hidden);
 
-export default function AboutPanel() {
+export default function AboutPanel({ places }: { places?: ReactNode }) {
   // Remembered across refreshes so the panel doesn't snap shut on reload.
   const [openPref, setOpenPref] = usePersistentState("about:open", "0");
   const [tabPref, setTabPref] = usePersistentState("about:tab", tabs[0].id);
@@ -276,7 +258,7 @@ export default function AboutPanel() {
                 aria-labelledby={`tab-${t.id}`}
                 hidden={i !== active}
               >
-                {t.content}
+                {t.id === "places" ? places : t.content}
               </div>
             ))}
           </div>

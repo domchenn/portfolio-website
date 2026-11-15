@@ -1,5 +1,6 @@
 import AboutPanel from "@/components/AboutPanel";
 import LocalClock from "@/components/LocalClock";
+import TravelMap from "@/components/TravelMap";
 import { Entry, ColumnHeading } from "@/components/Entry";
 
 export default function Home() {
@@ -68,7 +69,7 @@ export default function Home() {
                 Software Engineer. AI features for a student recruiting platform.
               </Entry>
               <Entry title="Boston College">
-                Research Assistant. counterbalancing sycophancy in AI agents.
+                Research Assistant. Counterbalancing sycophancy in AI agents.
               </Entry>
               <Entry title="Boston College">Probability Theory TA.</Entry>
               <Entry title="AWS">Campus Ambassador.</Entry>
@@ -76,7 +77,7 @@ export default function Home() {
             </div>
           </section>
 
-          <AboutPanel />
+          <AboutPanel places={<TravelMap />} />
 
           <footer className="flex flex-wrap gap-x-7 gap-y-3 text-[16px]">
             <a href="https://github.com/domchenn">GitHub</a>
