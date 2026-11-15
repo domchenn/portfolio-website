@@ -2,7 +2,8 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-// A string value remembered in localStorage across refreshes.
+// A string value remembered for the current browser tab: it survives refreshes, but a new tab
+// or a new visit starts fresh (sessionStorage is cleared when the tab closes).
 // Falls back to in-memory state when storage is unavailable (private mode, blocked site data).
 // Server render and first client render use `fallback`, so hydration always matches.
 
@@ -12,7 +13,7 @@ const listeners = new Set<() => void>();
 function read(key: string): string | null {
   if (memory.has(key)) return memory.get(key)!;
   try {
-    return window.localStorage.getItem(key);
+    return window.sessionStorage.getItem(key);
   } catch {
     return null;
   }
@@ -20,10 +21,8 @@ function read(key: string): string | null {
 
 function subscribe(onChange: () => void) {
   listeners.add(onChange);
-  window.addEventListener("storage", onChange); // other tabs
   return () => {
     listeners.delete(onChange);
-    window.removeEventListener("storage", onChange);
   };
 }
 
@@ -38,7 +37,7 @@ export function usePersistentState(key: string, fallback: string): [string, (val
     (next: string) => {
       memory.set(key, next);
       try {
-        window.localStorage.setItem(key, next);
+        window.sessionStorage.setItem(key, next);
       } catch {
         // storage unavailable: memory copy still works for this page view
       }
