@@ -4,10 +4,8 @@ import { useEffect, useState } from "react";
 import {
   fetchEspnTeam,
   fetchF1,
-  fetchTour,
   type FinishedGame,
   type TeamStatus,
-  type TourStatus,
   type UpcomingGame,
 } from "@/lib/sports";
 
@@ -37,22 +35,6 @@ function teamView(s: TeamStatus, noun = "game"): View {
     return { live: `${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, lines: [next], record: s.record };
   }
   return { lines: [s.last ? `Last: ${fmtLast(s.last)}` : `No recent ${noun}`, next], record: s.record };
-}
-
-/** One line per tour ("ATP: …"), plus the next event when the current one is wrapping up. */
-function tennisView(tours: { label: string; t: TourStatus | null }[]): View {
-  const now = Date.now();
-  const lines: string[] = [];
-  for (const { label, t } of tours) {
-    if (!t?.current) continue;
-    const c = t.current;
-    const started = Date.parse(c.start) <= now;
-    const over = c.end ? now >= Date.parse(c.end) : false;
-    if (started && !over) lines.push(`${label}: ${c.name}`);
-    else if (!started) lines.push(`${label}: ${c.name} · starts ${when(c.start, false)}`);
-    if (t.next) lines.push(`${label} next: ${t.next.name} · ${when(t.next.start, false)}`);
-  }
-  return { lines: lines.length ? lines : ["Off-season"] };
 }
 
 // ---------- rows ----------
@@ -108,22 +90,6 @@ const ROWS: RowDef[] = [
       const drivers = f.drivers.map((d) => `${d.code} P${d.position}`).join(" · ");
       // Driver standings play the role of the "record" for F1.
       return { lines, record: drivers || undefined };
-    },
-  },
-  {
-    id: "tennis",
-    name: "Tennis",
-    league: "ATP · WTA",
-    load: async () => {
-      const [atp, wta] = await Promise.all([
-        fetchTour("atp").catch(() => null),
-        fetchTour("wta").catch(() => null),
-      ]);
-      if (!atp && !wta) throw new Error("tennis unavailable");
-      return tennisView([
-        { label: "ATP", t: atp },
-        { label: "WTA", t: wta },
-      ]);
     },
   },
 ];
