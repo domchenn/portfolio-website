@@ -98,12 +98,51 @@ function Food() {
   );
 }
 
+// Top 5s, in order. Add `note` to a title for a one-line take.
+type Title = { name: string; year: string; note?: string };
+
+const topLists: { heading: string; items: Title[] }[] = [
+  {
+    heading: "Shows",
+    items: [
+      { name: "The Big Bang Theory", year: "2007–2019" },
+      { name: "Suits", year: "2011–2019" },
+      { name: "Grey's Anatomy", year: "2005–" },
+      { name: "Breaking Bad", year: "2008–2013" },
+      { name: "Ted Lasso", year: "2020–" },
+    ],
+  },
+  {
+    heading: "Movies",
+    items: [
+      { name: "The Social Network", year: "2010" },
+      { name: "Parasite", year: "2019" },
+      { name: "Ratatouille", year: "2007" },
+      { name: "Spirited Away", year: "2001" },
+      { name: "Inglourious Basterds", year: "2009" },
+    ],
+  },
+];
+
 function Watching() {
   return (
-    <div className="flex flex-col gap-5">
-      <Entry title="[TV show]">[One line on why]</Entry>
-      <Entry title="[TV show]">[One line on why]</Entry>
-      <Entry title="[Movie]">[One line on why]</Entry>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-x-9 gap-y-8">
+      {topLists.map(({ heading, items }) => (
+        <div key={heading} className="flex flex-col gap-2">
+          <h3 className="m-0 text-[15px] font-normal text-label">{heading}</h3>
+          <ol className="m-0 p-0 list-none flex flex-col border-t border-rule-soft">
+            {items.map((t, i) => (
+              <li key={t.name} className="flex gap-4 items-baseline py-2.5 border-b border-rule-soft">
+                <span className="w-4 shrink-0 text-[15px] text-label tabular-nums">{i + 1}</span>
+                <span className="min-w-0">
+                  {t.name} <span className="text-[15px] text-label tabular-nums">{t.year}</span>
+                  {t.note && <span className="block text-muted">{t.note}</span>}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
     </div>
   );
 }
@@ -166,7 +205,6 @@ function Courses() {
 // Set `hidden: true` to take a tab off the page without deleting its content.
 const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean }[] = [
   { id: "food", label: "Where I eat", content: <Food />, hidden: true },
-  { id: "watching", label: "Watching", content: <Watching />, hidden: true },
   {
     id: "teams",
     label: "Sports teams I follow",
@@ -180,6 +218,7 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
   { id: "courses", label: "Courses I've taken", content: <Courses /> },
   // Filled in from the server (see `places` prop) so the map ships as static SVG.
   { id: "places", label: "Places I've been", content: null },
+  { id: "watching", label: "Top shows & movies", content: <Watching /> },
   { id: "interests", label: "Interests", content: <Interests />, hidden: true },
 ];
 
