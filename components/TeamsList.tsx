@@ -4,10 +4,10 @@ import { useEffect, useState } from "react";
 import {
   fetchEspnTeam,
   fetchF1,
-  fetchTournament,
+  fetchTour,
   type FinishedGame,
   type TeamStatus,
-  type Tournament,
+  type TourStatus,
   type UpcomingGame,
 } from "@/lib/sports";
 
@@ -39,69 +39,67 @@ function teamView(s: TeamStatus, noun = "game"): View {
   return { lines: [s.last ? `Last: ${fmtLast(s.last)}` : `No recent ${noun}`, next], record: s.record };
 }
 
-function tennisView(atp: Tournament | null, wta: Tournament | null): View {
+/** One line per tour ("ATP: …"), plus the next event when the current one is wrapping up. */
+function tennisView(tours: { label: string; t: TourStatus | null }[]): View {
   const now = Date.now();
-  const running = (t: Tournament) => Date.parse(t.start) <= now && (!t.end || now < Date.parse(t.end));
-  const tours = [atp, wta].filter((t): t is Tournament => !!t);
-  if (!tours.length) return { lines: ["Off-season"] };
-  const live = tours.filter(running);
-  const later = tours.filter((t) => !running(t));
-  return {
-    lines: [
-      ...(live.length ? [`Now: ${live.map((t) => t.name).join(" · ")}`] : []),
-      ...later.map((t) => `Next: ${t.name} · ${when(t.start, false)}`),
-    ],
-  };
+  const lines: string[] = [];
+  for (const { label, t } of tours) {
+    if (!t?.current) continue;
+    const c = t.current;
+    const started = Date.parse(c.start) <= now;
+    const over = c.end ? now >= Date.parse(c.end) : false;
+    if (started && !over) lines.push(`${label}: ${c.name}`);
+    else if (!started) lines.push(`${label}: ${c.name} · starts ${when(c.start, false)}`);
+    if (t.next) lines.push(`${label} next: ${t.next.name} · ${when(t.next.start, false)}`);
+  }
+  return { lines: lines.length ? lines : ["Off-season"] };
 }
 
 // ---------- rows ----------
 
-type RowDef = { name: string; league: string; href: string; load: () => Promise<View> };
-
-const ESPN_WEB = "https://www.espn.com";
+type RowDef = { id: string; name: string; league: string; load: () => Promise<View> };
 
 const ROWS: RowDef[] = [
   {
+    id: "gsw",
     name: "Golden State Warriors",
     league: "NBA",
-    href: `${ESPN_WEB}/nba/team/_/name/gs`,
     load: async () => teamView(await fetchEspnTeam("basketball/nba", "gs")),
   },
   {
+    id: "sf",
     name: "San Francisco 49ers",
     league: "NFL",
-    href: `${ESPN_WEB}/nfl/team/_/name/sf`,
     load: async () => teamView(await fetchEspnTeam("football/nfl", "sf")),
   },
   {
+    id: "chelsea",
     name: "Chelsea",
     league: "Premier League",
-    href: `${ESPN_WEB}/soccer/team/_/id/363`,
     load: async () => teamView(await fetchEspnTeam("soccer/eng.1", "363"), "match"),
   },
   {
+    id: "bc-football",
     name: "Boston College",
     league: "Football",
-    href: `${ESPN_WEB}/college-football/team/_/id/103`,
     load: async () => teamView(await fetchEspnTeam("football/college-football", "103")),
   },
   {
+    id: "bc-basketball",
     name: "Boston College",
     league: "Basketball",
-    href: `${ESPN_WEB}/mens-college-basketball/team/_/id/103`,
     load: async () => teamView(await fetchEspnTeam("basketball/mens-college-basketball", "103")),
   },
   {
+    id: "bc-hockey",
     name: "Boston College",
     league: "Hockey",
-    // ESPN has no college hockey team page, so link BC Athletics instead.
-    href: "https://bceagles.com/sports/mens-ice-hockey",
     load: async () => teamView(await fetchEspnTeam("hockey/mens-college-hockey", "103")),
   },
   {
+    id: "f1",
     name: "Ferrari & Williams",
     league: "F1",
-    href: `${ESPN_WEB}/f1/standings`,
     load: async () => {
       const f = await fetchF1();
       const lines: string[] = [];
@@ -113,15 +111,19 @@ const ROWS: RowDef[] = [
     },
   },
   {
+    id: "tennis",
     name: "Tennis",
     league: "ATP · WTA",
-    href: `${ESPN_WEB}/tennis/`,
     load: async () => {
       const [atp, wta] = await Promise.all([
-        fetchTournament("atp").catch(() => null),
-        fetchTournament("wta").catch(() => null),
+        fetchTour("atp").catch(() => null),
+        fetchTour("wta").catch(() => null),
       ]);
-      return tennisView(atp, wta);
+      if (!atp && !wta) throw new Error("tennis unavailable");
+      return tennisView([
+        { label: "ATP", t: atp },
+        { label: "WTA", t: wta },
+      ]);
     },
   },
 ];
@@ -129,8 +131,9 @@ const ROWS: RowDef[] = [
 // ---------- component ----------
 
 export default function TeamsList() {
-  const [views, setViews] = useState<(View | null)[]>(() => ROWS.map(() => null));
-  const [failed, setFailed] = useState<boolean[]>(() => ROWS.map(() => false));
+  // Keyed by row id (not position) so adding/reordering rows can't show one team's data on another.
+  const [views, setViews] = useState<Record<string, View>>({});
+  const [failed, setFailed] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -148,8 +151,14 @@ export default function TeamsList() {
       );
       if (stopped) return;
       // Keep the last good value for any row whose request failed.
-      setViews((prev) => results.map((v, i) => v ?? prev[i]));
-      setFailed(results.map((v) => v === null));
+      setViews((prev) => {
+        const nextViews = { ...prev };
+        results.forEach((v, i) => {
+          if (v) nextViews[ROWS[i].id] = v;
+        });
+        return nextViews;
+      });
+      setFailed(Object.fromEntries(results.map((v, i) => [ROWS[i].id, v === null])));
       if (!document.hidden) {
         timer = setTimeout(refresh, results.some((v) => v?.live) ? LIVE_REFRESH : IDLE_REFRESH);
       }
@@ -171,19 +180,16 @@ export default function TeamsList() {
 
   return (
     <div className="flex flex-col border-t border-rule-soft">
-      {ROWS.map((row, i) => {
-        const v = views[i];
+      {ROWS.map((row) => {
+        const v = views[row.id];
         return (
           <div
-            key={`${row.name}-${row.league}`}
+            key={row.id}
             className="flex flex-wrap justify-between items-baseline gap-x-6 gap-y-1 py-3.5 border-b border-rule-soft"
           >
             <span className="flex flex-col">
               <span>
-                <a href={row.href} target="_blank" rel="noopener noreferrer">
-                  {row.name}
-                </a>{" "}
-                <span className="text-label">{row.league}</span>
+                {row.name} <span className="text-label">{row.league}</span>
               </span>
               {v?.record && <span className="text-[15px] text-label tabular-nums">{v.record}</span>}
             </span>
@@ -200,7 +206,7 @@ export default function TeamsList() {
               )}
               {v
                 ? v.lines.map((line, j) => <span key={j}>{line}</span>)
-                : <span>{failed[i] ? "Unavailable right now" : "Loading…"}</span>}
+                : <span>{failed[row.id] ? "Unavailable right now" : "Loading…"}</span>}
             </span>
           </div>
         );

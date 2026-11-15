@@ -198,12 +198,34 @@ export async function fetchF1(): Promise<F1Status> {
 // ---------- Tennis ----------
 
 export type Tournament = { name: string; start: string; end?: string };
+export type TourStatus = { current?: Tournament; next?: Tournament };
 
-/** Headline tournament on an ESPN tennis tour ("atp" | "wta"). */
-export async function fetchTournament(tour: "atp" | "wta"): Promise<Tournament | null> {
-  const json = await getJson<{ events?: { name: string; date: string; endDate?: string }[] }>(
-    `${ESPN}/tennis/${tour}/scoreboard`
-  );
-  const e = json.events?.[0];
-  return e ? { name: e.name, start: e.date, end: e.endDate } : null;
+type TennisBoard = { events?: { name: string; date: string; endDate?: string }[] };
+const toTournament = (e: { name: string; date: string; endDate?: string }): Tournament => ({
+  name: e.name,
+  start: e.date,
+  end: e.endDate,
+});
+const ymd = (d: Date) => d.toISOString().slice(0, 10).replace(/-/g, "");
+
+/**
+ * Headline tournament this week on an ESPN tennis tour ("atp" | "wta"), plus the following one
+ * when the current event ends within two days (so e.g. the ATP Finals shows up on the weekend before).
+ */
+export async function fetchTour(tour: "atp" | "wta"): Promise<TourStatus> {
+  const url = `${ESPN}/tennis/${tour}/scoreboard`;
+  const now = await getJson<TennisBoard>(url);
+  const first = now.events?.[0];
+  if (!first) return {};
+  const current = toTournament(first);
+
+  let next: Tournament | undefined;
+  const end = current.end ? new Date(current.end) : null;
+  if (end && end.getTime() - Date.now() < 2 * 24 * 3600_000) {
+    const dayAfter = new Date(end.getTime() + 24 * 3600_000);
+    const later = await getJson<TennisBoard>(`${url}?dates=${ymd(dayAfter)}`).catch(() => null);
+    const e = later?.events?.find((x) => x.name !== current.name);
+    if (e) next = toTournament(e);
+  }
+  return { current, next };
 }
