@@ -5,24 +5,48 @@ import { Entry } from "@/components/Entry";
 import TeamsList from "@/components/TeamsList";
 import { usePersistentState } from "@/lib/usePersistentState";
 
-// Courses by term (no grades). `note` and `rating` (out of 10) are optional per course.
+// CS + Math courses by semester, oldest first (no grades).
+// `note` and `rating` (out of 10) are optional per course.
 type Course = { name: string; code: string; note?: string; rating?: number };
+type TermStatus = "past" | "now" | "next";
 
-type TermStatus = "next" | "now" | "past";
-const courseTerms: { term: string; status: TermStatus; courses: Course[] }[] = [
+const courseTerms: { term: string; year?: string; status: TermStatus; courses: Course[] }[] = [
   {
-    term: "Spring 2027",
-    status: "next",
+    term: "Fall 2024",
+    year: "Freshman",
+    status: "past",
     courses: [
-      { name: "Algorithms", code: "CSCI 3383" },
-      { name: "Applied AI Systems", code: "CSCI 3400" },
-      { name: "AI and Ethics", code: "CSCI 3334" },
-      { name: "Introduction to Abstract Mathematics", code: "MATH 2216" },
-      { name: "Probability", code: "MATH 4426" },
+      { name: "Computer Science I", code: "CSCI 1101" },
+      { name: "Calculus II", code: "MATH 1103" },
+    ],
+  },
+  {
+    term: "Spring 2025",
+    status: "past",
+    courses: [
+      { name: "Computer Science II", code: "CSCI 1102" },
+      { name: "Logic and Computation", code: "CSCI 2243" },
+      { name: "Computer Organization and Lab", code: "CSCI 2272" },
+    ],
+  },
+  {
+    term: "Fall 2025",
+    year: "Sophomore",
+    status: "past",
+    courses: [{ name: "Linear Algebra", code: "MATH 2210" }],
+  },
+  {
+    term: "Spring 2026",
+    status: "past",
+    courses: [
+      { name: "Randomness and Computation", code: "CSCI 2244" },
+      { name: "Data, Ethics and Society", code: "CSCI 2268" },
+      { name: "Multivariable Calculus", code: "MATH 2202" },
     ],
   },
   {
     term: "Fall 2026",
+    year: "Junior",
     status: "now",
     courses: [
       { name: "Machine Learning", code: "CSCI 3345" },
@@ -32,18 +56,14 @@ const courseTerms: { term: string; status: TermStatus; courses: Course[] }[] = [
     ],
   },
   {
-    term: "Earlier",
-    status: "past",
+    term: "Spring 2027",
+    status: "next",
     courses: [
-      { name: "Randomness and Computation", code: "CSCI 2244" },
-      { name: "Logic and Computation", code: "CSCI 2243" },
-      { name: "Data, Ethics and Society", code: "CSCI 2268" },
-      { name: "Computer Organization and Lab", code: "CSCI 2272" },
-      { name: "Computer Science II", code: "CSCI 1102" },
-      { name: "Computer Science I", code: "CSCI 1101" },
-      { name: "Linear Algebra", code: "MATH 2210" },
-      { name: "Multivariable Calculus", code: "MATH 2202" },
-      { name: "Calculus II", code: "MATH 1103" },
+      { name: "Algorithms", code: "CSCI 3383" },
+      { name: "Applied AI Systems", code: "CSCI 3400" },
+      { name: "AI and Ethics", code: "CSCI 3334" },
+      { name: "Introduction to Abstract Mathematics", code: "MATH 2216" },
+      { name: "Probability", code: "MATH 4426" },
     ],
   },
 ];
@@ -89,46 +109,57 @@ function Watching() {
   );
 }
 
-const SUBJECTS: Record<string, string> = { CSCI: "Computer Science", MATH: "Math" };
+const dotStyles: Record<TermStatus, string> = {
+  past: "bg-bg border-label",
+  now: "bg-fg border-fg",
+  next: "bg-bg border-fg border-dashed",
+};
 
-/** Courses grouped by subject (from the course code prefix), current/next ones tagged. */
+/** Vertical timeline, freshman year at the top down to now, then next semester. */
 function Courses() {
-  const groups = new Map<string, (Course & { status: TermStatus })[]>();
-  for (const { status, courses } of courseTerms) {
-    for (const c of courses) {
-      const subject = SUBJECTS[c.code.split(" ")[0]] ?? "Other";
-      if (!groups.has(subject)) groups.set(subject, []);
-      groups.get(subject)!.push({ ...c, status });
-    }
-  }
-
   return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-x-9 gap-y-8">
-      {[...groups].map(([subject, courses]) => (
-        <div key={subject} className="flex flex-col gap-2">
-          <h3 className="m-0 text-[15px] font-normal text-label">{subject}</h3>
-          <ul className="m-0 p-0 list-none flex flex-col border-t border-rule-soft">
-            {courses.map((c) => (
-              <li
-                key={c.code}
-                title={c.code}
-                className="flex justify-between items-baseline gap-4 py-2 border-b border-rule-soft"
-              >
-                <span className="min-w-0">
-                  {c.name}
-                  {c.note && <span className="text-label"> ({c.note})</span>}
-                </span>
-                {c.status !== "past" && (
-                  <span className={`shrink-0 text-[15px] ${c.status === "now" ? "text-fg" : "text-label"}`}>
-                    {c.status}
+    <ol className="m-0 p-0 list-none flex flex-col">
+      {courseTerms.map(({ term, year, status, courses }, i) => {
+        const isLast = i === courseTerms.length - 1;
+        return (
+          <li key={term} className="relative pl-7 pb-7 last:pb-0">
+            {!isLast && (
+              <span
+                aria-hidden="true"
+                className={`absolute left-[5px] top-3 bottom-0 w-px ${
+                  courseTerms[i + 1].status === "next" ? "border-l border-dashed border-rule" : "bg-rule"
+                }`}
+              />
+            )}
+            <span
+              aria-hidden="true"
+              className={`absolute left-0 top-[7px] w-[11px] h-[11px] rounded-full border ${dotStyles[status]}`}
+            />
+            <h3 className="m-0 text-[15px] font-normal">
+              <span className={status === "past" ? "text-label" : "text-fg"}>{term}</span>
+              {year && <span className="text-label"> · {year}</span>}
+              {status !== "past" && <span className="text-label"> · {status}</span>}
+            </h3>
+            <p className="mt-1 mb-0 text-muted leading-[1.7]">
+              {courses.map((c, j) => (
+                <span key={c.code}>
+                  <span title={c.code} className="whitespace-nowrap">
+                    {c.name}
+                    {c.note && <span className="text-label"> ({c.note})</span>}
+                    {c.rating !== undefined && <span className="text-label"> {c.rating}/10</span>}
                   </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </div>
+                  {j < courses.length - 1 && (
+                    <span className="text-label" aria-hidden="true">
+                      {" · "}
+                    </span>
+                  )}
+                </span>
+              ))}
+            </p>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
