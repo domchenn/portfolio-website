@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   fetchEspnTeam,
   fetchF1,
+  type F1Status,
   type FinishedGame,
   type TeamStatus,
   type UpcomingGame,
@@ -37,6 +38,47 @@ function teamView(s: TeamStatus, noun = "game"): View {
   }
   const last: Item = { label: "Last", value: s.last ? fmtLast(s.last) : `No recent ${noun}` };
   return { items: [last, next], record: s.record };
+}
+
+// ---------- F1 ----------
+
+const F1_TEAMS = ["ferrari", "williams"];
+const shortRace = (name: string) => name.replace(/Grand Prix$/, "GP");
+
+// Both F1 cards share one fetch per refresh.
+let f1Cache: { at: number; promise: Promise<F1Status> } | null = null;
+function getF1() {
+  if (!f1Cache || Date.now() - f1Cache.at > 15_000) {
+    f1Cache = { at: Date.now(), promise: fetchF1(F1_TEAMS) };
+    f1Cache.promise.catch(() => (f1Cache = null));
+  }
+  return f1Cache.promise;
+}
+
+function f1Row(id: string, name: string): RowDef {
+  return {
+    id: `f1-${id}`,
+    name,
+    league: "F1",
+    load: async () => {
+      const f = await getF1();
+      const team = f.teams[id];
+      const items: Item[] = [];
+      if (team?.drivers.length) {
+        items.push({ label: "Drivers", value: team.drivers.map((d) => `${d.code} P${d.position}`).join(" · ") });
+      }
+      if (f.lastRace) {
+        const finishes = team?.lastFinishes.map((r) => `${r.code} ${r.result}`).join(", ");
+        items.push({ label: "Last", value: `${shortRace(f.lastRace.name)}${finishes ? ` · ${finishes}` : ""}` });
+      }
+      items.push({
+        label: "Next",
+        value: f.nextRace ? `${shortRace(f.nextRace.name)} · ${when(f.nextRace.date)}` : "Season over",
+      });
+      const record = team?.standing ? `P${team.standing.position} · ${team.standing.points} pts` : undefined;
+      return { items, record };
+    },
+  };
 }
 
 // ---------- rows ----------
@@ -80,20 +122,8 @@ const ROWS: RowDef[] = [
     league: "Hockey",
     load: async () => teamView(await fetchEspnTeam("hockey/mens-college-hockey", "103")),
   },
-  {
-    id: "f1",
-    name: "Ferrari & Williams",
-    league: "F1",
-    load: async () => {
-      const f = await fetchF1();
-      const items: Item[] = [];
-      if (f.lastRace) items.push({ label: "Last", value: `${f.lastRace.name} · won by ${f.lastRace.winner}` });
-      items.push({ label: "Next", value: f.nextRace ? `${f.nextRace.name} · ${when(f.nextRace.date)}` : "Season over" });
-      const drivers = f.drivers.map((d) => `${d.code} P${d.position}`).join(" · ");
-      // Driver standings play the role of the "record" for F1.
-      return { items, record: drivers || undefined };
-    },
-  },
+  f1Row("ferrari", "Ferrari"),
+  f1Row("williams", "Williams"),
 ];
 
 // ---------- component ----------

@@ -146,52 +146,94 @@ export async function fetchEspnTeam(path: string, team: string): Promise<TeamSta
 
 // ---------- Formula 1 ----------
 
+export type F1Team = {
+  /** Constructors' championship position and points, e.g. { position: 2, points: 510 } */
+  standing?: { position: number; points: number };
+  /** This team's drivers in the drivers' championship. */
+  drivers: { code: string; position: number; points: number }[];
+  /** Where this team's drivers finished in the most recent race ("DNF" etc. when not classified). */
+  lastFinishes: { code: string; result: string }[];
+};
+
 export type F1Status = {
   lastRace?: { name: string; date: string; winner: string };
   nextRace?: { name: string; date: string };
-  drivers: { code: string; position: number; points: number }[];
+  teams: Record<string, F1Team>;
 };
 
 type ErgastRace = {
   raceName: string;
   date: string;
   time?: string;
-  Results?: { Driver: { code: string } }[];
+  Results?: {
+    position: string;
+    positionText: string;
+    Driver: { code: string };
+    Constructor: { constructorId: string };
+  }[];
 };
 
-const TRACKED_DRIVERS = ["hamilton", "leclerc", "sainz", "albon"];
-
-export async function fetchF1(): Promise<F1Status> {
+/** Ergast constructor ids, e.g. ["ferrari", "williams"]. */
+export async function fetchF1(teamIds: string[]): Promise<F1Status> {
   type RaceTable = { MRData: { RaceTable: { Races: ErgastRace[] } } };
-  type Standings = {
+  type DriverStandings = {
     MRData: {
       StandingsTable: {
         StandingsLists: {
-          DriverStandings: { position: string; points: string; Driver: { driverId: string; code: string } }[];
+          DriverStandings: {
+            position: string;
+            points: string;
+            Driver: { code: string };
+            Constructors: { constructorId: string }[];
+          }[];
+        }[];
+      };
+    };
+  };
+  type ConstructorStandings = {
+    MRData: {
+      StandingsTable: {
+        StandingsLists: {
+          ConstructorStandings: { position: string; points: string; Constructor: { constructorId: string } }[];
         }[];
       };
     };
   };
 
-  const [last, next, standings] = await Promise.all([
+  const [last, next, drivers, constructors] = await Promise.all([
     getJson<RaceTable>(`${F1}/last/results.json`).catch(() => null),
     getJson<RaceTable>(`${F1}/next.json`).catch(() => null),
-    getJson<Standings>(`${F1}/driverStandings.json`).catch(() => null),
+    getJson<DriverStandings>(`${F1}/driverStandings.json`).catch(() => null),
+    getJson<ConstructorStandings>(`${F1}/constructorStandings.json`).catch(() => null),
   ]);
+  if (!last && !next && !drivers && !constructors) throw new Error("F1 data unavailable");
 
   const lr = last?.MRData.RaceTable.Races[0];
   const nr = next?.MRData.RaceTable.Races[0];
-  const list = standings?.MRData.StandingsTable.StandingsLists[0]?.DriverStandings ?? [];
+  const driverList = drivers?.MRData.StandingsTable.StandingsLists[0]?.DriverStandings ?? [];
+  const constructorList = constructors?.MRData.StandingsTable.StandingsLists[0]?.ConstructorStandings ?? [];
+
+  const teams: Record<string, F1Team> = {};
+  for (const id of teamIds) {
+    const c = constructorList.find((x) => x.Constructor.constructorId === id);
+    teams[id] = {
+      standing: c ? { position: Number(c.position), points: Number(c.points) } : undefined,
+      drivers: driverList
+        .filter((d) => d.Constructors.some((k) => k.constructorId === id))
+        .map((d) => ({ code: d.Driver.code, position: Number(d.position), points: Number(d.points) }))
+        .sort((a, b) => a.position - b.position),
+      lastFinishes: (lr?.Results ?? [])
+        .filter((r) => r.Constructor.constructorId === id)
+        .map((r) => ({ code: r.Driver.code, result: /^\d+$/.test(r.positionText) ? `P${r.positionText}` : "DNF" })),
+    };
+  }
 
   return {
     lastRace: lr
       ? { name: lr.raceName, date: `${lr.date}T${lr.time ?? "12:00:00Z"}`, winner: lr.Results?.[0]?.Driver.code ?? "" }
       : undefined,
     nextRace: nr ? { name: nr.raceName, date: `${nr.date}T${nr.time ?? "12:00:00Z"}` } : undefined,
-    drivers: list
-      .filter((d) => TRACKED_DRIVERS.includes(d.Driver.driverId))
-      .map((d) => ({ code: d.Driver.code, position: Number(d.position), points: Number(d.points) }))
-      .sort((a, b) => a.position - b.position),
+    teams,
   };
 }
 
