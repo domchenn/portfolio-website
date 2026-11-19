@@ -253,7 +253,17 @@ const allTabs: { id: string; label: string; content: ReactNode; hidden?: boolean
     label: "Sports teams I follow",
     content: (
       <div className="flex flex-col gap-3">
-        <span className="text-[15px] text-faint">Updates live</span>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[15px] text-faint">
+          <span>Updates live</span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="inline-block w-3 h-3 rounded-[3px] border border-[#4A2A2C]" />
+            Live now
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden="true" className="inline-block w-3 h-3 rounded-[3px] border border-[#4A4224]" />
+            Within 48 hours
+          </span>
+        </div>
         <TeamsList />
       </div>
     ),
