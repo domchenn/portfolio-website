@@ -83,7 +83,7 @@ export default function Home() {
             <a href="https://github.com/domchenn">GitHub</a>
             <a href="https://www.linkedin.com/in/chendomi">LinkedIn</a>
             <a href="mailto:gchendomi@gmail.com">Email</a>
-            <a href="#">Résumé</a>
+            <a href="/Dominic_Chen_Resume.pdf" target="_blank" rel="noopener noreferrer">Résumé</a>
           </footer>
         </main>
       </div>
