@@ -14,6 +14,14 @@ import {
 
 const LIVE_REFRESH = 30_000; // while any game is in progress
 const IDLE_REFRESH = 10 * 60_000; // otherwise
+const SOON_WINDOW = 48 * 60 * 60_000; // next game this close gets the yellow outline
+
+/** True if `iso` is in the future and within SOON_WINDOW. */
+function isSoon(iso?: string) {
+  if (!iso) return false;
+  const ms = new Date(iso).getTime() - Date.now();
+  return ms > 0 && ms <= SOON_WINDOW;
+}
 
 function when(iso: string, withTime = true) {
   const opts: Intl.DateTimeFormatOptions = { weekday: "short", month: "short", day: "numeric" };
@@ -27,7 +35,7 @@ const fmtNext = (g: UpcomingGame) => `${g.isHome ? "vs" : "at"} ${g.opponent} ·
 
 /** `live` is the in-progress score (shown first, highlighted); `items` are labeled lines below it. */
 type Item = { label: string; value: string };
-type View = { live?: string; items: Item[]; record?: string };
+type View = { live?: string; soon?: boolean; items: Item[]; record?: string };
 
 /** Not live: last game + next game. Live: score + next game. Record shows under the team name. */
 function teamView(s: TeamStatus, noun = "game"): View {
@@ -37,7 +45,7 @@ function teamView(s: TeamStatus, noun = "game"): View {
     return { live: `${us.abbr} ${us.score}–${them.score} ${them.abbr} · ${detail}`, items: [next], record: s.record };
   }
   const last: Item = { label: "Last", value: s.last ? fmtLast(s.last) : `No recent ${noun}` };
-  return { items: [last, next], record: s.record };
+  return { items: [last, next], record: s.record, soon: isSoon(s.next?.date) };
 }
 
 // ---------- F1 ----------
@@ -76,7 +84,7 @@ function f1Row(id: string, name: string): RowDef {
         value: f.nextRace ? `${shortRace(f.nextRace.name)} · ${when(f.nextRace.date)}` : "Season over",
       });
       const record = team?.standing ? `P${team.standing.position} · ${team.standing.points} pts` : undefined;
-      return { items, record };
+      return { items, record, soon: isSoon(f.nextRace?.date) };
     },
   };
 }
@@ -183,7 +191,9 @@ export default function TeamsList() {
         return (
           <article
             key={row.id}
-            className={`flex flex-col gap-4 rounded-lg border p-4 ${v?.live ? "border-[#4A2A2C]" : "border-rule"}`}
+            className={`flex flex-col gap-4 rounded-lg border p-4 ${
+              v?.live ? "border-[#4A2A2C]" : v?.soon ? "border-[#4A4224]" : "border-rule"
+            }`}
           >
             <header className="flex flex-col">
               <span className="text-[15px] text-label">{row.league}</span>
