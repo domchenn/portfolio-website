@@ -82,7 +82,7 @@ export default function Home() {
           <footer className="flex flex-wrap gap-x-7 gap-y-3 text-[16px]">
             <a href="https://github.com/domchenn">GitHub</a>
             <a href="https://www.linkedin.com/in/chendomi">LinkedIn</a>
-            <a href="mailto:gchendomi@gmail.com">Email</a>
+            <a href="mailto:domchenn@gmail.com">Email</a>
             <a href="/Dominic_Chen_Resume.pdf" target="_blank" rel="noopener noreferrer">Résumé</a>
           </footer>
         </main>
